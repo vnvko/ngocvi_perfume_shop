@@ -21,6 +21,7 @@ import BlogDetail      from '../pages/Blog/BlogDetail';
 import Contact         from '../pages/Contact/Contact';
 import Policy          from '../pages/Policy/Policy';
 import OrderDetail     from '../pages/OrderDetail/OrderDetail';
+import ReviewProduct   from '../pages/ProductDetail/ReviewProduct';
 import ProfileLayout   from '../pages/Profile/ProfileLayout';
 import ProfileOverview from '../pages/Profile/ProfileOverview';
 import PersonalInfo    from '../pages/Profile/PersonalInfo';
@@ -82,9 +83,10 @@ export default function AppRoutes() {
 
       {/* Store */}
       <Route path="/"               element={<MainLayout><HomePage /></MainLayout>} />
-      <Route path="/products"       element={<MainLayout><ProductList /></MainLayout>} />
-      <Route path="/products/:slug" element={<MainLayout><ProductDetail /></MainLayout>} />
-      <Route path="/cart"           element={<MainLayout><Cart /></MainLayout>} />
+      <Route path="/products"         element={<MainLayout><ProductList /></MainLayout>} />
+      <Route path="/products/:slug"   element={<MainLayout><ProductDetail /></MainLayout>} />
+      <Route path="/products/:slug/review" element={<MainLayout><ReviewProduct /></MainLayout>} />
+      <Route path="/cart"             element={<MainLayout><Cart /></MainLayout>} />
       <Route path="/wishlist"       element={<MainLayout><Wishlist /></MainLayout>} />
       <Route path="/quiz"           element={<MainLayout><Quiz /></MainLayout>} />
       <Route path="/blog"           element={<MainLayout><BlogList /></MainLayout>} />
