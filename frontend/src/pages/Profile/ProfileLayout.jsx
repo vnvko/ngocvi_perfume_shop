@@ -1,6 +1,7 @@
 // Layout trang tài khoản — sidebar điều hướng các mục profile
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet, Navigate } from 'react-router-dom';
 import { FiGrid, FiUser, FiShoppingBag, FiMapPin, FiLock, FiLogOut, FiChevronRight } from 'react-icons/fi';
+import { useAuth } from '../../context/AuthContext';
 
 const menuItems = [
   { to: '/profile', label: 'Tổng quan', icon: FiGrid, end: true },
@@ -11,6 +12,10 @@ const menuItems = [
 ];
 
 export default function ProfileLayout() {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="min-h-[60vh] flex items-center justify-center text-sm">Đang tải...</div>;
+  if (!user) return <Navigate to="/login" replace />;
+
   return (
     <div>
       {/* Breadcrumb */}

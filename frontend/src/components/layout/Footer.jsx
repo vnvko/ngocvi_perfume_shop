@@ -40,11 +40,11 @@ export default function Footer() {
           <div>
             <h4 className="text-xs tracking-widest uppercase font-sans font-medium mb-5 text-light-secondary">{"Chính Sách"}</h4>
             <ul className="space-y-3">
-              <li><Link to="/policy" className="text-muted text-sm font-sans hover:text-white transition-colors">{"Giao Hàng Toàn Quốc"}</Link></li>
-              <li><Link to="/policy" className="text-muted text-sm font-sans hover:text-white transition-colors">{"return"}</Link></li>
-              <li><Link to="/policy" className="text-muted text-sm font-sans hover:text-white transition-colors">{"privacy"}</Link></li>
-              <li><Link to="/policy" className="text-muted text-sm font-sans hover:text-white transition-colors">{"terms"}</Link></li>
-              <li><Link to="/contact" className="text-muted text-sm font-sans hover:text-white transition-colors">{"Yêu Thích"}</Link></li>
+              <li><Link to="/policy/shipping" className="text-muted text-sm font-sans hover:text-white transition-colors">{"Giao Hàng Toàn Quốc"}</Link></li>
+              <li><Link to="/policy/return" className="text-muted text-sm font-sans hover:text-white transition-colors">{"Quy Định Đổi Trả"}</Link></li>
+              <li><Link to="/policy/privacy" className="text-muted text-sm font-sans hover:text-white transition-colors">{"Chính Sách Bảo Mật"}</Link></li>
+              <li><Link to="/policy/terms" className="text-muted text-sm font-sans hover:text-white transition-colors">{"Điều Khoản"}</Link></li>
+              <li><Link to="/wishlist" className="text-muted text-sm font-sans hover:text-white transition-colors">{"Yêu Thích"}</Link></li>
             </ul>
           </div>
 

@@ -1,6 +1,7 @@
 // Trang trắc nghiệm — 5 câu hỏi tìm mùi phù hợp, kết quả gợi ý sản phẩm
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { productAPI } from '../../services/api';
 
 const priceRanges = {
@@ -12,6 +13,8 @@ const priceRanges = {
 const fmtPrice = (n) => new Intl.NumberFormat('vi-VN').format(n || 0) + 'đ';
 
 export default function Quiz() {
+  const translation = useTranslation();
+  const t = translation?.t || ((key) => key);
 
   const quizQuestions = [
     { id: 1, key: 'q1', options: [

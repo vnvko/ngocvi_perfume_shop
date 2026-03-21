@@ -90,16 +90,16 @@ export default function AppRoutes() {
       <Route path="/blog"           element={<MainLayout><BlogList /></MainLayout>} />
       <Route path="/blog/:slug"     element={<MainLayout><BlogDetail /></MainLayout>} />
       <Route path="/contact"        element={<MainLayout><Contact /></MainLayout>} />
-      <Route path="/policy"         element={<MainLayout><Policy /></MainLayout>} />
+      <Route path="/policy/:section?" element={<MainLayout><Policy /></MainLayout>} />
 
       {/* Profile */}
       <Route path="/profile" element={<MainLayout><ProfileLayout /></MainLayout>}>
         <Route index            element={<ProfileOverview />} />
-        <Route path="info"      element={<PersonalInfo />} />
-        <Route path="Đơn Hàng"    element={<Orders />} />
+        <Route path="info"     element={<PersonalInfo />} />
+        <Route path="orders"   element={<Orders />} />
         <Route path="orders/:orderId" element={<OrderDetail />} />
-        <Route path="Địa Chỉ" element={<Addresses />} />
-        <Route path="Mật khẩu"  element={<ChangePassword />} />
+        <Route path="addresses" element={<Addresses />} />
+        <Route path="password" element={<ChangePassword />} />
       </Route>
 
       {/* Admin */}

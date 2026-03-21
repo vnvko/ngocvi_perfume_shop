@@ -1,8 +1,14 @@
 // Trang chính sách — vận chuyển, đổi trả, bảo hành, bảo mật, điều khoản
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 
 export default function Policy() {
-  const [active, setActive] = useState('shipping');
+  const { section } = useParams();
+  const [active, setActive] = useState(section || 'shipping');
+
+  useEffect(() => {
+    if (section) setActive(section);
+  }, [section]);
 
   const sections = [
     {

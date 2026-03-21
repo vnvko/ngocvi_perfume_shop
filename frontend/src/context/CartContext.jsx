@@ -1,6 +1,6 @@
 // Context quản lý giỏ hàng và wishlist — đồng bộ với backend khi đã đăng nhập
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { cartAPI, wishlistAPI } from '../services/api';
+import { cartAPI, wishlistAPI, productAPI } from '../services/api';
 
 const CartContext = createContext(null);
 
@@ -65,12 +65,38 @@ export function CartProvider({ children }) {
       return;
     }
     try {
-      const variantId = product.variants?.find(v => `${v.volume_ml}ml` === size)?.id
-                     || product.variants?.[0]?.id;
+      let variants = product.variants;
+      if (!variants?.length) {
+        // Lấy chi tiết sản phẩm nếu chưa có variant trong dữ liệu list
+        const slug = product.slug || product.product_slug || null;
+        if (slug) {
+          const detailRes = await productAPI.getBySlug(slug);
+          variants = detailRes.data?.product?.variants || [];
+        }
+      }
+
+      let variantId = null;
+      const normalizedSize = String(size || '').trim().replace(/\s*ml/i, '').trim();
+      const targetVolume = parseInt(normalizedSize, 10);
+      if (variants?.length) {
+        variantId = variants.find(v => {
+          const volume = v.volume_ml !== undefined && v.volume_ml !== null ? parseInt(String(v.volume_ml).replace(/\D/g, ''), 10) : NaN;
+          if (!isNaN(targetVolume) && !isNaN(volume)) {
+            return volume === targetVolume;
+          }
+          return String(v.volume_ml).toLowerCase() === String(size).toLowerCase().replace(/\s+/g, '');
+        })?.id;
+        if (!variantId) {
+          variantId = variants[0].id;
+        }
+      }
+
       if (!variantId) {
         console.warn('No variant found for', product.name, size);
+        alert('Không tìm thấy phiên bản sản phẩm phù hợp. Vui lòng thử lại sau.');
         return;
       }
+
       await cartAPI.addItem({ product_id: product.id, variant_id: variantId, quantity });
       await fetchCart();
     } catch (err) {

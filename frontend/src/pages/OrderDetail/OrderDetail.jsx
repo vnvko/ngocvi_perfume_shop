@@ -120,8 +120,9 @@ export default function OrderDetail() {
                   </div>
                   <div>
                     <p className="font-sans text-sm font-medium text-dark">{item.product_name}</p>
-                    <p className="text-xs text-muted font-sans md:hidden">{item.volume_ml}ml · {fmtPrice(item.price)}</p>
-                  </div>
+                    <p className="text-xs text-muted font-sans md:hidden">{item.volume_ml}ml · {fmtPrice(item.price)}</p>                      {order.status === 'completed' && (
+                        <Link to={`/products/${item.product_slug || ''}`} className="text-xs text-primary hover:underline">Viết đánh giá</Link>
+                      )}                  </div>
                 </div>
                 <div className="hidden md:block col-span-2 text-sm font-sans text-muted text-center">{item.volume_ml}ml</div>
                 <div className="hidden md:block col-span-2 text-sm font-sans text-dark text-right">{fmtPrice(item.price)}</div>
