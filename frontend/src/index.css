@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-light text-dark font-sans;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, h5 {
+    @apply font-serif;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary text-white px-8 py-3 text-xs tracking-widest uppercase font-sans font-medium 
+           hover:bg-primary-dark transition-all duration-300 inline-block;
+  }
+
+  .btn-outline {
+    @apply border border-dark text-dark px-8 py-3 text-xs tracking-widest uppercase font-sans font-medium 
+           hover:bg-dark hover:text-white transition-all duration-300 inline-block;
+  }
+
+  .btn-outline-gold {
+    @apply border border-primary text-primary px-8 py-3 text-xs tracking-widest uppercase font-sans font-medium 
+           hover:bg-primary hover:text-white transition-all duration-300 inline-block;
+  }
+
+  .section-title {
+    @apply font-display text-3xl md:text-4xl text-dark text-center;
+  }
+
+  .label-tag {
+    @apply text-[10px] tracking-widest uppercase text-muted font-sans font-medium;
+  }
+
+  .price {
+    @apply font-sans font-medium text-dark;
+  }
+
+  .price-gold {
+    @apply font-sans font-semibold text-primary;
+  }
+
+  .product-card {
+    @apply cursor-pointer;
+  }
+
+  .product-card-img {
+    @apply overflow-hidden bg-light-secondary aspect-square;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F8F5F0;
+}
+::-webkit-scrollbar-thumb {
+  background: #C9A96E;
+  border-radius: 3px;
+}
+
+/* Swiper custom */
+.swiper-pagination-bullet-active {
+  background: #C9A96E !important;
+}
+.swiper-button-next::after,
+.swiper-button-prev::after {
+  font-size: 14px !important;
+  color: #C9A96E !important;
+}
+
+/* ── Admin Panel Styles ── */
+.admin-body { font-family: 'Inter', sans-serif; }
+.card { @apply bg-white border border-gray-100 rounded-lg p-5 shadow-sm; }
+.badge-green { @apply text-[11px] font-medium px-2.5 py-1 bg-green-50 text-green-700 rounded-full; }
+.badge-yellow { @apply text-[11px] font-medium px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full; }
+.badge-blue { @apply text-[11px] font-medium px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full; }
+.badge-red { @apply text-[11px] font-medium px-2.5 py-1 bg-red-50 text-red-700 rounded-full; }
+.badge-gray { @apply text-[11px] font-medium px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full; }
+.table-head { @apply text-[10px] tracking-wider uppercase text-gray-400 font-medium; }
+.table-row { @apply border-b border-gray-50 hover:bg-gray-50/50 transition-colors; }
+.toggle { @apply relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer; }
+
+/* ── Missing utility classes ── */
+.input {
+  @apply border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary transition-colors rounded-md w-full;
+  font-family: 'Inter', sans-serif;
+}
+.input:disabled {
+  @apply bg-gray-50 text-gray-400 cursor-not-allowed;
+}
+select.input {
+  @apply cursor-pointer;
+}
+textarea.input {
+  @apply resize-none;
+}
+.btn-outline {
+  @apply border border-gray-200 bg-white text-gray-700 text-xs tracking-widest uppercase font-sans px-4 py-2 hover:border-primary hover:text-primary transition-colors;
+}
+.section-title {
+  @apply font-display text-3xl md:text-4xl text-dark;
+}
+.label-tag {
+  @apply text-[10px] tracking-[0.2em] uppercase font-sans text-muted;
+}
+
+/* ── Admin body font ── */
+.admin-panel, .admin-panel * {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
