@@ -156,6 +156,18 @@ const Order = {
     return true;
   },
 
+  // Kiểm tra user có mua sản phẩm trong đơn hàng đã hoàn tất
+  async hasPurchased(userId, productId) {
+    const [rows] = await db.query(
+      `SELECT 1 FROM orders o
+       JOIN order_items oi ON o.id = oi.order_id
+       WHERE o.user_id = ? AND oi.product_id = ? AND o.status = 'completed'
+       LIMIT 1`,
+      [userId, productId]
+    );
+    return rows.length > 0;
+  },
+
   // Lấy tất cả đơn hàng (admin)
   async adminGetAll({ search = '', status = '', payment = '', page = 1, limit = 10 } = {}) {
     const offset = (page - 1) * limit;

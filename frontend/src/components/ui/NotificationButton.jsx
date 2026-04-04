@@ -124,7 +124,7 @@ export default function NotificationButton() {
                   {/* CTA: review nếu completed */}
                   {n.canReview && (
                     <div className="px-4 pb-3 -mt-1">
-                      <Link to={`/products`} onClick={() => setOpen(false)}
+                      <Link to={`/profile/orders/${n.orderId}`} onClick={() => setOpen(false)}
                         className="inline-flex items-center gap-1.5 text-[11px] font-sans font-medium text-white bg-primary px-3 py-1.5 rounded hover:bg-primary-dark transition-colors">
                         <FiStar size={11} /> Đánh giá sản phẩm
                       </Link>

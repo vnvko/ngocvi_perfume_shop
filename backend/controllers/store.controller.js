@@ -149,6 +149,12 @@ const ReviewController = {
       if (!product_id || !rating) return error(res, 'Thiếu thông tin đánh giá', 400);
       if (rating < 1 || rating > 5) return error(res, 'Đánh giá phải từ 1-5 sao', 400);
 
+      // Kiểm tra user đã mua sản phẩm này (với đơn hàng hoàn tất)
+      const hasPurchased = await Order.hasPurchased(req.user.id, product_id);
+      if (!hasPurchased) {
+        return error(res, 'Bạn phải mua sản phẩm này mới có thể đánh giá', 403);
+      }
+
       const id = await Review.create({
         user_id: req.user.id,
         product_id,
