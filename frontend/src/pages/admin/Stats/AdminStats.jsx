@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminLayout } from '../../../components/admin/AdminLayout';
 import { adminAPI } from '../../../services/api';
+import { mediaUrl } from '../../../utils/mediaUrl';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -254,7 +255,7 @@ export default function AdminStats() {
                 <div key={p.id} className="flex items-center gap-3">
                   <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0">{i+1}</span>
                   <div className="w-9 h-9 rounded-lg overflow-hidden bg-gray-50 flex-shrink-0">
-                    {p.thumbnail && <img src={p.thumbnail} alt={p.name} className="w-full h-full object-cover" />}
+                    {p.thumbnail && <img src={mediaUrl(p.thumbnail)} alt={p.name} className="w-full h-full object-cover" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-gray-800 truncate">{p.name}</p>

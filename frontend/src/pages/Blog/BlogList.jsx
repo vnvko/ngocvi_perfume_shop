@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FiSearch, FiArrowRight } from 'react-icons/fi';
 import { blogAPI } from '../../services/api';
+import { mediaUrl } from '../../utils/mediaUrl';
 
 export default function BlogList() {
   const [blogs, setBlogs] = useState([]);
@@ -42,10 +43,10 @@ export default function BlogList() {
       {/* Hero */}
       <div className="relative h-52 md:h-72 overflow-hidden bg-dark">
         <img src="https://images.unsplash.com/photo-1523293182086-7651a899d37f?w=1400&q=80"
-          alt="Perfume Journal" className="absolute inset-0 w-full h-full object-cover opacity-40" />
+          alt="Nhật ký nước hoa" className="absolute inset-0 w-full h-full object-cover opacity-40" />
         <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-center">
-          <h1 className="font-display text-3xl md:text-5xl tracking-wider mb-2">Perfume Journal</h1>
-          <p className="font-display italic text-primary/90 text-lg">The Art of Fragrance</p>
+          <h1 className="font-display text-3xl md:text-5xl tracking-wider mb-2">Nhật ký nước hoa</h1>
+          <p className="font-display italic text-primary/90 text-lg">Nghệ thuật hương thơm</p>
         </div>
       </div>
 
@@ -55,7 +56,7 @@ export default function BlogList() {
           <div className="flex gap-4 md:gap-6 overflow-x-auto pb-1">
             <button onClick={() => { setActiveCategory(''); setPage(1); }}
               className={`text-[11px] tracking-widest uppercase font-sans font-medium whitespace-nowrap pb-0.5 border-b-[1.5px] transition-all ${!activeCategory ? 'text-dark border-dark' : 'text-muted border-transparent hover:text-dark'}`}>
-              ALL
+              Tất cả
             </button>
             {categories.map(cat => (
               <button key={cat.id} onClick={() => { setActiveCategory(cat.slug); setPage(1); }}
@@ -67,7 +68,7 @@ export default function BlogList() {
           <form onSubmit={handleSearch} className="relative flex-shrink-0">
             <FiSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
             <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Search articles..."
+              placeholder="Tìm kiếm bài viết..."
               className="border border-light-secondary bg-light pl-9 pr-4 py-2 text-sm font-sans outline-none focus:border-primary transition-colors w-48" />
           </form>
         </div>
@@ -89,7 +90,7 @@ export default function BlogList() {
               <Link key={post.id} to={`/blog/${post.slug}`} className="group">
                 <div className="overflow-hidden aspect-[4/3] mb-4">
                   {post.thumbnail ? (
-                    <img src={post.thumbnail} alt={post.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    <img src={mediaUrl(post.thumbnail)} alt={post.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                   ) : (
                     <div className="w-full h-full bg-light-secondary flex items-center justify-center text-muted text-sm font-sans">Chưa có ảnh</div>
                   )}
@@ -101,7 +102,7 @@ export default function BlogList() {
                 </div>
                 <h3 className="font-serif text-dark text-[17px] leading-snug mb-2 group-hover:text-primary transition-colors">{post.title}</h3>
                 <span className="text-[11px] tracking-widest uppercase font-sans text-primary inline-flex items-center gap-1 group-hover:gap-2 transition-all">
-                  Read More <FiArrowRight size={11} />
+                  Xem thêm <FiArrowRight size={11} />
                 </span>
               </Link>
             ))}

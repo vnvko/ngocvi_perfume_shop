@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { FiArrowLeft, FiPrinter, FiCheck, FiTruck, FiPackage, FiFlag, FiMail, FiPhone, FiMapPin } from 'react-icons/fi';
 import { AdminLayout } from '../../../components/admin/AdminLayout';
 import { adminAPI } from '../../../services/api';
+import { mediaUrl } from '../../../utils/mediaUrl';
 
 const fmtPrice = (n) => new Intl.NumberFormat('vi-VN').format(n || 0) + 'đ';
 
@@ -186,7 +187,7 @@ export default function AdminOrderDetail() {
                     <td className="py-3 pr-4">
                       <div className="flex items-center gap-3">
                         <div className="w-11 h-11 rounded-lg overflow-hidden bg-gray-50 flex-shrink-0">
-                          {item.thumbnail ? <img src={item.thumbnail} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-100" />}
+                          {item.thumbnail ? <img src={mediaUrl(item.thumbnail)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-100" />}
                         </div>
                         <div>
                           <p className="text-xs font-medium text-gray-800">{item.product_name}</p>

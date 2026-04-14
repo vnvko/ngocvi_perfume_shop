@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { FiArrowLeft, FiChevronRight, FiCheck, FiTruck, FiPackage, FiFlag } from 'react-icons/fi';
 import { orderAPI } from '../../services/api';
+import { mediaUrl } from '../../utils/mediaUrl';
 
 const fmtPrice = (n) => new Intl.NumberFormat('vi-VN').format(n || 0) + 'đ';
 
@@ -116,13 +117,13 @@ export default function OrderDetail() {
               <div key={i} className="grid grid-cols-12 gap-4 px-5 py-4 items-center border-t border-light-secondary first:border-0">
                 <div className="col-span-12 md:col-span-5 flex items-center gap-3">
                   <div className="w-14 h-14 bg-light-secondary flex-shrink-0 overflow-hidden">
-                    {item.thumbnail ? <img src={item.thumbnail} alt={item.product_name} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-light-secondary" />}
+                    {item.thumbnail ? <img src={mediaUrl(item.thumbnail)} alt={item.product_name} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-light-secondary" />}
                   </div>
                   <div>
                     <p className="font-sans text-sm font-medium text-dark">{item.product_name}</p>
                     <p className="text-xs text-muted font-sans md:hidden">{item.volume_ml}ml · {fmtPrice(item.price)}</p>
-                    {(order.status === 'completed' || order.status === 'shipping') && (
-                      <Link to={`/products/${item.product_slug || ''}/review?orderId=${order.id}`} className="text-xs text-primary hover:underline">Viết đánh giá</Link>
+                    {order.status === 'completed' && item.product_slug && (
+                      <Link to={`/products/${item.product_slug}/review?orderId=${order.id}`} className="text-xs text-primary hover:underline">Viết đánh giá</Link>
                     )}
                   </div>
                 </div>

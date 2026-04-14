@@ -1,6 +1,7 @@
 // Hero Banner — slideshow tự động, lấy banner từ API, fallback nếu chưa có data
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { mediaUrl } from '../../utils/mediaUrl';
 import { bannerAPI } from '../../services/api';
 
 const fallbackSlides = [
@@ -26,16 +27,16 @@ export default function HeroBanner() {
   const slide = slides[current];
 
   return (
-    <section className="relative h-[70vh] md:h-[85vh] overflow-hidden">
+    <section className="relative h-[clamp(420px,72vh,860px)] overflow-hidden">
       {slides.map((s, i) => (
         <div key={s.id} className={`absolute inset-0 transition-opacity duration-1000 ${i === current ? 'opacity-100' : 'opacity-0'}`}>
-          <img src={s.image_url} alt={s.title || 'Banner'} className="w-full h-full object-cover" />
+          <img src={mediaUrl(s.image_url)} alt={s.title || 'Banner'} className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-r from-dark/70 via-dark/30 to-transparent" />
         </div>
       ))}
 
       <div className="relative z-10 h-full flex items-center">
-        <div className="max-w-screen-xl mx-auto px-6 md:px-12 w-full">
+        <div className="site-container w-full">
           <div className="max-w-lg">
             {slide.subtitle && <p className="text-primary text-[11px] tracking-[0.4em] uppercase font-sans mb-4 opacity-0 animate-[fadeInUp_0.8s_0.2s_forwards]">{slide.subtitle}</p>}
             <h1 className="text-white font-display text-4xl md:text-6xl leading-tight mb-8 whitespace-pre-line opacity-0 animate-[fadeInUp_0.8s_0.4s_forwards]">

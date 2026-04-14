@@ -5,11 +5,14 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   body {
     @apply bg-light text-dark font-sans;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
   }
 
   h1, h2, h3, h4, h5 {
@@ -55,6 +58,23 @@
 
   .product-card-img {
     @apply overflow-hidden bg-light-secondary aspect-square;
+  }
+
+  /* Container dùng chung để các section co giãn đồng nhất */
+  .site-container {
+    width: min(1440px, calc(100% - 2rem));
+    margin-inline: auto;
+  }
+
+  @media (min-width: 768px) {
+    .site-container {
+      width: min(1440px, calc(100% - 4rem));
+    }
+  }
+
+  /* Khoảng cách section linh hoạt theo viewport */
+  .section-space {
+    padding-block: clamp(3rem, 6vw, 5rem);
   }
 }
 

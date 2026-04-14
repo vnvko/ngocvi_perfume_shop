@@ -2,8 +2,8 @@
 import { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { FiSearch, FiShoppingBag, FiUser, FiHeart, FiX, FiMenu, FiLogOut } from 'react-icons/fi';
-import { useCart } from '../../context/CartContext';
-import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../hooks/useCart';
+import { useAuth } from '../../hooks/useAuth';
 import NotificationButton from '../ui/NotificationButton';
 
 export default function Header() {
@@ -19,7 +19,7 @@ export default function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { cartCount, wishlistCount } = useCart();
+  const { cartCount = 0, wishlistCount = 0 } = useCart();
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
 
@@ -69,7 +69,7 @@ export default function Header() {
             {/* Logo */}
             <Link to="/" className="flex-1 md:flex-none text-center md:mx-12">
               <div className="font-serif text-2xl md:text-3xl tracking-[0.15em] text-dark leading-none">NGOCVI</div>
-              <div className="text-[9px] tracking-[0.35em] text-muted font-sans mt-0.5">PERFUME BOUTIQUE</div>
+              <div className="text-[9px] tracking-[0.35em] text-muted font-sans mt-0.5">NƯỚC HOA CAO CẤP</div>
             </Link>
 
             {/* Desktop right nav */}
@@ -105,7 +105,7 @@ export default function Header() {
                       <p className="text-xs font-sans font-medium text-dark truncate">{user.name}</p>
                       <p className="text-[10px] text-muted font-sans truncate">{user.email}</p>
                     </div>
-                    {isAdmin && <Link to="/admin" className="flex items-center gap-2 px-4 py-2.5 text-xs font-sans text-dark hover:bg-primary hover:text-white transition-colors">{"Dashboard Admin"}</Link>}
+                    {isAdmin && <Link to="/admin" className="flex items-center gap-2 px-4 py-2.5 text-xs font-sans text-dark hover:bg-primary hover:text-white transition-colors">{"Trang quản trị"}</Link>}
                     <Link to="/profile" className="flex items-center gap-2 px-4 py-2.5 text-xs font-sans text-dark hover:bg-light-secondary transition-colors">{"Tài khoản"}</Link>
                     <Link to="/profile/orders" className="flex items-center gap-2 px-4 py-2.5 text-xs font-sans text-dark hover:bg-light-secondary transition-colors">{"Đơn hàng"}</Link>
                     <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2.5 text-xs font-sans text-red-500 hover:bg-red-50 transition-colors w-full text-left border-t border-light-secondary">

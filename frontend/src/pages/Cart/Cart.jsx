@@ -1,10 +1,11 @@
 // Trang giỏ hàng — cập nhật số lượng, xóa, tổng tiền, gợi ý sản phẩm
 import { Link } from 'react-router-dom';
 import { FiTrash2, FiMinus, FiPlus, FiArrowLeft } from 'react-icons/fi';
-import { useCart } from '../../context/CartContext';
+import { useCart } from '../../hooks/useCart';
 import ProductCard from '../../components/Product/ProductCard';
 import { useState, useEffect } from 'react';
 import { productAPI } from '../../services/api';
+import { mediaUrl } from '../../utils/mediaUrl';
 
 const fmtPrice = (n) => new Intl.NumberFormat('vi-VN').format(n || 0) + 'đ';
 
@@ -15,7 +16,10 @@ export default function Cart() {
 
   useEffect(() => {
     productAPI.getAll({ limit: 4, sort: 'newest' })
-      .then(res => setSuggested(res.data || []))
+      .then((res) => {
+        const raw = res.data;
+        setSuggested(Array.isArray(raw) ? raw : []);
+      })
       .catch(() => {});
   }, []);
 
@@ -73,7 +77,7 @@ export default function Cart() {
                   <div key={itemId} className="py-5 grid grid-cols-12 gap-4 items-center">
                     <div className="col-span-12 md:col-span-5 flex items-center gap-4">
                       <Link to={`/products/${slug}`} className="w-18 h-18 md:w-20 md:h-20 flex-shrink-0 bg-light-secondary overflow-hidden">
-                        {thumbnail ? <img src={thumbnail} alt={name} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-light-secondary" />}
+                        {thumbnail ? <img src={mediaUrl(thumbnail)} alt={name} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-light-secondary" />}
                       </Link>
                       <div>
                         <p className="label-tag mb-0.5">{brand}</p>
@@ -112,10 +116,10 @@ export default function Cart() {
             </div>
           </div>
 
-          {/* Order summary */}
+          {/* Tóm tắt đơn hàng */}
           <div className="lg:col-span-1">
             <div className="bg-light-secondary p-6">
-              <h3 className="font-serif text-xl text-dark mb-5">{"orderSummary"}</h3>
+              <h3 className="font-serif text-xl text-dark mb-5">{"Tóm tắt đơn hàng"}</h3>
               <div className="space-y-3 mb-4">
                 <div className="flex justify-between text-sm font-sans">
                   <span className="text-muted">Tạm tính</span>
@@ -139,7 +143,7 @@ export default function Cart() {
                   <span className="font-sans text-xl font-semibold text-primary">{fmtPrice(cartTotal + shipping)}</span>
                 </div>
               </div>
-              <Link to="/checkout" className="btn-primary w-full text-center block">{"checkout"}</Link>
+              <Link to="/checkout" className="btn-primary w-full text-center block">{"Thanh toán"}</Link>
             </div>
           </div>
         </div>
@@ -147,7 +151,7 @@ export default function Cart() {
 
       {suggested.length > 0 && (
         <div className="mt-20 border-t border-light-secondary pt-12">
-          <h2 className="font-display text-2xl text-dark mb-8 text-center">{"suggested"}</h2>
+          <h2 className="font-display text-2xl text-dark mb-8 text-center">{"Có thể bạn sẽ thích"}</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
             {suggested.map(p => <ProductCard key={p.id} product={p} />)}
           </div>

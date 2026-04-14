@@ -1,26 +1,53 @@
 // Controllers store — Order, Cart, Review, Blog, Wishlist, Voucher, Banner
+const path = require('path');
+const db = require('../config/db');
 const Order = require('../models/Order');
 const { Cart, Review, Blog, Wishlist, Voucher, Banner } = require('../models/index');
 const { success, error, paginate } = require('../utils/response');
+const { unlinkUploadUrl } = require('../utils/fileStorage');
 
 // ── Order Controller ──
 const OrderController = {
   async create(req, res) {
     try {
-      const { items, shipping_address, payment_method, voucher_id } = req.body;
+      const { items, shipping_address, payment_method, voucher_id, shipping_method = 'standard' } = req.body;
       if (!items || !items.length) return error(res, 'Giỏ hàng trống', 400);
 
-      // Tính phí ship cơ bản
-      const shipping_fee = payment_method === 'COD' ? 35000 : 0;
+      // Phí ship — thống nhất với Checkout: COD có phí 35k; hỏa tốc +30k
+      let shipping_fee = 0;
+      if (payment_method === 'COD') shipping_fee += 35000;
+      if (shipping_method === 'express') shipping_fee += 30000;
 
-      // Tính discount từ voucher nếu có
+      // Subtotal thật từ DB (không dùng price từ client — tránh voucher sai & tổng đơn âm)
+      let realSubtotal = 0;
+      for (const item of items) {
+        const pid = parseInt(item.product_id, 10);
+        const vid = parseInt(item.variant_id, 10);
+        const qty = parseInt(item.quantity, 10);
+        if (!pid || !vid || !qty || qty < 1) {
+          return error(res, 'Thông tin sản phẩm trong đơn không hợp lệ', 400);
+        }
+        const [variants] = await db.query(
+          'SELECT price, stock FROM product_variants WHERE id = ? AND product_id = ?',
+          [vid, pid]
+        );
+        if (!variants.length) return error(res, 'Sản phẩm hoặc biến thể không tồn tại', 400);
+        if (variants[0].stock < qty) return error(res, 'Sản phẩm không đủ tồn kho', 400);
+        realSubtotal += variants[0].price * qty;
+      }
+
+      // Tính discount từ voucher nếu có (frontend gửi id sau khi check mã)
       let discount = 0;
       let voucherId = null;
       if (voucher_id) {
         try {
-          const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-          const { voucher, discountAmount } = await Voucher.check(voucher_id, req.user.id, subtotal);
-          discount = discountAmount;
+          const { voucher, discountAmount } = await Voucher.validateById(
+            voucher_id,
+            req.user.id,
+            realSubtotal
+          );
+          const maxOff = realSubtotal + shipping_fee;
+          discount = Math.min(discountAmount, maxOff);
           voucherId = voucher.id;
         } catch (vErr) {
           return error(res, vErr.message, 400);
@@ -143,26 +170,69 @@ const ReviewController = {
     }
   },
 
+  /** Đăng nhập — kiểm tra quyền gửi đánh giá (đã mua + đơn hoàn tất, chưa có review) */
+  async getEligibility(req, res) {
+    try {
+      const productId = parseInt(req.params.productId, 10);
+      if (!productId) return error(res, 'Sản phẩm không hợp lệ', 400);
+      const hasPurchased = await Order.hasPurchased(req.user.id, productId);
+      const alreadyReviewed = await Review.hasUserReviewed(req.user.id, productId);
+      const canReview = hasPurchased && !alreadyReviewed;
+      return success(res, { canReview, alreadyReviewed, hasPurchased });
+    } catch (err) {
+      return error(res, 'Lỗi kiểm tra đánh giá');
+    }
+  },
+
   async create(req, res) {
+    const uploaded = req.files || [];
     try {
       const { product_id, rating, comment } = req.body;
-      if (!product_id || !rating) return error(res, 'Thiếu thông tin đánh giá', 400);
-      if (rating < 1 || rating > 5) return error(res, 'Đánh giá phải từ 1-5 sao', 400);
+      if (!product_id || rating === undefined || rating === null) {
+        for (const f of uploaded) unlinkUploadUrl(`/uploads/reviews/${f.filename}`);
+        return error(res, 'Thiếu thông tin đánh giá', 400);
+      }
+      const rNum = parseInt(rating, 10);
+      if (Number.isNaN(rNum) || rNum < 1 || rNum > 5) {
+        for (const f of uploaded) unlinkUploadUrl(`/uploads/reviews/${f.filename}`);
+        return error(res, 'Đánh giá phải từ 1-5 sao', 400);
+      }
+      const text = typeof comment === 'string' ? comment.trim() : '';
+      if (!text) {
+        for (const f of uploaded) unlinkUploadUrl(`/uploads/reviews/${f.filename}`);
+        return error(res, 'Vui lòng nhập nhận xét', 400);
+      }
+      if (text.length > 5000) {
+        for (const f of uploaded) unlinkUploadUrl(`/uploads/reviews/${f.filename}`);
+        return error(res, 'Nhận xét quá dài (tối đa 5000 ký tự)', 400);
+      }
+      if (uploaded.length > 5) {
+        for (const f of uploaded) unlinkUploadUrl(`/uploads/reviews/${f.filename}`);
+        return error(res, 'Tối đa 5 file ảnh/video đính kèm', 400);
+      }
 
-      // Kiểm tra user đã mua sản phẩm này (với đơn hàng hoàn tất)
       const hasPurchased = await Order.hasPurchased(req.user.id, product_id);
       if (!hasPurchased) {
-        return error(res, 'Bạn phải mua sản phẩm này mới có thể đánh giá', 403);
+        for (const f of uploaded) unlinkUploadUrl(`/uploads/reviews/${f.filename}`);
+        return error(res, 'Chỉ khách đã mua và hoàn tất đơn hàng mới được đánh giá sản phẩm này', 403);
       }
+
+      const mediaItems = uploaded.map((f) => {
+        const ext = path.extname(f.filename).toLowerCase();
+        const isVideo = ['.mp4', '.webm', '.mov'].includes(ext);
+        return { file_url: `/uploads/reviews/${f.filename}`, media_type: isVideo ? 'video' : 'image' };
+      });
 
       const id = await Review.create({
         user_id: req.user.id,
         product_id,
-        rating: parseInt(rating),
-        comment,
+        rating: rNum,
+        comment: text,
+        mediaItems,
       });
       return success(res, { id }, 'Đánh giá thành công', 201);
     } catch (err) {
+      for (const f of uploaded) unlinkUploadUrl(`/uploads/reviews/${f.filename}`);
       return error(res, err.message || 'Lỗi gửi đánh giá');
     }
   },
@@ -173,7 +243,7 @@ const BlogController = {
   async getAll(req, res) {
     try {
       const { search, category, page = 1, limit = 9 } = req.query;
-      const { rows, total } = await Blog.getAll({ search, category, page, limit });
+      const { rows, total } = await Blog.getAll({ search, category, page, limit, onlyPublished: true });
       const categories = await Blog.getCategories();
       return success(res, { blogs: rows, categories, pagination: { total, page: +page, limit: +limit, totalPages: Math.ceil(total / limit) } });
     } catch (err) {
@@ -183,7 +253,7 @@ const BlogController = {
 
   async getBySlug(req, res) {
     try {
-      const blog = await Blog.getBySlug(req.params.slug);
+      const blog = await Blog.getBySlug(req.params.slug, { onlyPublished: true });
       if (!blog) return error(res, 'Không tìm thấy bài viết', 404);
       return success(res, { blog });
     } catch (err) {

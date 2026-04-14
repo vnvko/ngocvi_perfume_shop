@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { FiSave, FiX, FiUpload, FiPlus, FiTrash2 } from 'react-icons/fi';
 import { AdminLayout } from '../../../components/admin/AdminLayout';
 import { adminAPI, productAPI } from '../../../services/api';
+import { mediaUrl } from '../../../utils/mediaUrl';
 
 const slugify = (str) =>
   str.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim('-');
@@ -33,30 +34,51 @@ export default function AdminProductForm() {
   const [variants, setVariants]           = useState([{ volume_ml: 100, price: '', stock: 0 }]);
   const [mainImage, setMainImage]         = useState(null);
   const [mainImagePreview, setMainImagePreview] = useState(null);
+  const [galleryImages, setGalleryImages]           = useState([]);
   const [galleryPreviews, setGalleryPreviews]   = useState([]);
+  /** Ảnh đã lưu (chỉnh sửa) — xóa qua API */
+  const [serverImages, setServerImages] = useState([]);
 
   // Load brands & categories
   useEffect(() => {
-    productAPI.getBrands().then(r => setBrands(r.data.brands || [])).catch(() => {});
-    productAPI.getCategories().then(r => setCategories(r.data.categories || [])).catch(() => {});
+    productAPI.getBrands().then(r => setBrands(r.data?.brands || [])).catch(() => setBrands([]));
+    productAPI.getCategories().then(r => setCategories(r.data?.categories || [])).catch(() => setCategories([]));
   }, []);
 
   // Load product nếu là edit
   useEffect(() => {
     if (!isEdit) return;
     adminAPI.getProduct(id).then(r => {
-      const p = r.data.product;
+      const p = r.data?.product;
+      if (!p) {
+        setError('Không tải được dữ liệu sản phẩm.');
+        return;
+      }
       setForm({
         name: p.name || '', sku: p.sku || '',
         brand_id: p.brand_id || '', category_id: p.category_id || '',
         gender: p.gender || 'male', concentration: p.concentration || 'EDP',
         description: p.description || '', status: p.status || 'active',
         price: p.price || '', sale_price: p.sale_price || '',
-        meta_title: '', meta_desc: '',
+        meta_title: p.meta_title || '', meta_desc: p.meta_desc || '',
       });
+      setSelectedTags((p.tags || []).map(tag => {
+        const match = SCENT_TAGS.find(t => t.toLowerCase() === String(tag).trim().toLowerCase());
+        return match || String(tag).trim();
+      }));
       if (p.variants?.length) setVariants(p.variants.map(v => ({ id: v.id, volume_ml: v.volume_ml, price: v.price, stock: v.stock })));
-      if (p.images?.length) setMainImagePreview(p.images.find(i => i.is_main)?.image_url || p.images[0]?.image_url);
-    }).catch(() => {});
+      else setVariants([{ volume_ml: 100, price: '', stock: 0 }]);
+      setServerImages(Array.isArray(p.images) ? p.images : []);
+      setGalleryImages([]);
+      setGalleryPreviews([]);
+      setMainImage(null);
+      if (p.images?.length) {
+        const main = p.images.find((i) => i.is_main) || p.images[0];
+        setMainImagePreview(main?.image_url ? mediaUrl(main.image_url) : null);
+      } else {
+        setMainImagePreview(null);
+      }
+    }).catch(() => setError('Không tải được dữ liệu sản phẩm.'));
   }, [id, isEdit]);
 
   const update = (f, v) => {
@@ -80,6 +102,27 @@ export default function AdminProductForm() {
     setMainImagePreview(URL.createObjectURL(file));
   };
 
+  const handleRemoveServerImage = async (imgId) => {
+    if (!window.confirm('Xóa ảnh này khỏi sản phẩm? Thao tác không hoàn tác.')) return;
+    try {
+      await adminAPI.deleteImage(id, imgId);
+      const r = await adminAPI.getProduct(id);
+      const p = r.data?.product;
+      const imgs = Array.isArray(p?.images) ? p.images : [];
+      setServerImages(imgs);
+      if (!mainImage) {
+        if (imgs.length) {
+          const main = imgs.find((i) => i.is_main) || imgs[0];
+          setMainImagePreview(main?.image_url ? mediaUrl(main.image_url) : null);
+        } else {
+          setMainImagePreview(null);
+        }
+      }
+    } catch (err) {
+      setError(err.message || 'Không xóa được ảnh');
+    }
+  };
+
   const handleSubmit = async () => {
     if (!form.name.trim()) { setError('Vui lòng nhập tên sản phẩm'); return; }
     if (!form.price || isNaN(form.price)) { setError('Vui lòng nhập giá hợp lệ'); return; }
@@ -87,10 +130,13 @@ export default function AdminProductForm() {
     try {
       const payload = {
         ...form,
-        variants: JSON.stringify(variants),
-        tags: JSON.stringify(selectedTags),
+        variants,
+        tags: selectedTags,
       };
-      if (mainImage) payload.images = [mainImage];
+      const images = [];
+      if (mainImage) images.push(mainImage);
+      if (galleryImages.length) images.push(...galleryImages);
+      if (images.length) payload.images = images;
 
       if (isEdit) {
         await adminAPI.updateProduct(id, payload);
@@ -322,7 +368,29 @@ export default function AdminProductForm() {
               )}
             </label>
 
-            <p className="text-xs text-gray-500 mt-4 mb-2">Thư viện ảnh</p>
+            {isEdit && serverImages.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <p className="text-xs font-medium text-gray-700 mb-2">Ảnh đang lưu</p>
+                <p className="text-[10px] text-gray-400 mb-2">Xóa ảnh cũ trên máy chủ (file vật lý cũng được gỡ nếu là đường dẫn /uploads/...)</p>
+                <div className="flex gap-2 flex-wrap">
+                  {serverImages.map((img) => (
+                    <div key={img.id} className="relative w-16 h-16 group rounded-lg overflow-hidden border border-gray-200">
+                      <img src={mediaUrl(img.image_url)} alt="" className="w-full h-full object-cover" />
+                      {Number(img.is_main) === 1 && (
+                        <span className="absolute top-0 left-0 bg-primary text-white text-[8px] px-1 py-0.5 rounded-br">Chính</span>
+                      )}
+                      <button type="button" title="Xóa ảnh"
+                        onClick={() => handleRemoveServerImage(img.id)}
+                        className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                        <FiTrash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p className="text-xs text-gray-500 mt-4 mb-2">Thêm ảnh mới (upload thêm)</p>
             <div className="flex gap-2 flex-wrap">
               {galleryPreviews.map((src, i) => (
                 <img key={i} src={src} alt="" className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
@@ -332,6 +400,7 @@ export default function AdminProductForm() {
                 <input type="file" accept="image/*" multiple className="hidden"
                   onChange={e => {
                     const files = Array.from(e.target.files);
+                    setGalleryImages(prev => [...prev, ...files]);
                     setGalleryPreviews(prev => [...prev, ...files.map(f => URL.createObjectURL(f))]);
                   }} />
               </label>

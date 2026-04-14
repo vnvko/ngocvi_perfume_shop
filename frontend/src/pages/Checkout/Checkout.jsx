@@ -2,9 +2,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FiCheck, FiLock, FiChevronRight } from 'react-icons/fi';
-import { useCart } from '../../context/CartContext';
-import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../hooks/useCart';
+import { useAuth } from '../../hooks/useAuth';
 import { orderAPI, voucherAPI } from '../../services/api';
+import { mediaUrl } from '../../utils/mediaUrl';
 
 const fmtPrice = (n) => new Intl.NumberFormat('vi-VN').format(n || 0) + 'đ';
 
@@ -45,7 +46,8 @@ export default function Checkout() {
   const [done, setDone] = useState(false);
   const [orderCode, setOrderCode] = useState('');
 
-  const shippingCost = shipping === 'express' ? 30000 : 0;
+  // Đồng bộ với backend: COD +35k; hỏa tốc +30k thêm
+  const shippingCost = (payment === 'COD' ? 35000 : 0) + (shipping === 'express' ? 30000 : 0);
   const discount = voucherData?.discountAmount || 0;
   const total = cartTotal + shippingCost - discount;
 
@@ -83,6 +85,7 @@ export default function Checkout() {
         items,
         shipping_address: `${form.address}, ${form.district}, ${form.province}`,
         payment_method: payment,
+        shipping_method: shipping,
         voucher_id: voucherData?.voucher?.id || null,
       });
 
@@ -122,7 +125,7 @@ export default function Checkout() {
         <div className="max-w-screen-xl mx-auto flex items-center justify-between">
           <Link to="/" className="font-serif text-xl tracking-[0.2em]">NGOCVI</Link>
           <div className="hidden md:flex items-center text-[10px] tracking-widest uppercase font-sans text-muted gap-2">
-            <FiLock size={11} /> Secure Checkout
+            <FiLock size={11} /> Thanh toán bảo mật
           </div>
         </div>
       </div>
@@ -262,7 +265,7 @@ export default function Checkout() {
                 {cartItems.map(item => (
                   <div key={item.id} className="flex items-center gap-3">
                     <div className="relative w-12 h-12 flex-shrink-0 bg-white overflow-hidden">
-                      {item.thumbnail ? <img src={item.thumbnail} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-100" />}
+                      {item.thumbnail ? <img src={mediaUrl(item.thumbnail)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-100" />}
                       <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-dark text-white text-[9px] rounded-full flex items-center justify-center font-sans">{item.quantity}</span>
                     </div>
                     <div className="flex-1 min-w-0">
@@ -292,7 +295,7 @@ export default function Checkout() {
                   <span>{fmtPrice(cartTotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm font-sans">
-                  <span className="text-muted">Phí vận chuyển</span>
+                  <span className="text-muted">Phí giao hàng (COD / hỏa tốc)</span>
                   <span className={shippingCost === 0 ? 'text-primary font-medium' : ''}>{shippingCost === 0 ? 'Miễn phí' : fmtPrice(shippingCost)}</span>
                 </div>
                 {discount > 0 && (
@@ -314,7 +317,7 @@ export default function Checkout() {
 
               <button onClick={handleSubmit} disabled={loading || !cartItems.length}
                 className="btn-primary w-full text-center disabled:opacity-60">
-                {loading ? 'Đang xử lý...' : 'Đặt Hàng / Place Order'}
+                {loading ? 'Đang xử lý...' : 'Đặt hàng'}
               </button>
               <p className="text-[10px] text-muted font-sans text-center mt-3">
                 Bằng cách đặt hàng, bạn đồng ý với <a href="#" className="underline">Điều khoản</a> của chúng tôi

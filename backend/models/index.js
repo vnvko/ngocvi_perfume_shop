@@ -1,13 +1,35 @@
 // Models gộp — Category, Brand, Cart, Review, Blog, Wishlist, Voucher, Banner
 const db = require('../config/db');
+const { unlinkUploadUrl } = require('../utils/fileStorage');
+
+async function attachReviewMediaToRows(rows) {
+  if (!rows?.length) return;
+  try {
+    const ids = rows.map((r) => r.id);
+    const [mediaRows] = await db.query(
+      'SELECT review_id, id, media_type, file_url, sort_order FROM review_media WHERE review_id IN (?) ORDER BY review_id, sort_order',
+      [ids]
+    );
+    const map = {};
+    for (const m of mediaRows) {
+      if (!map[m.review_id]) map[m.review_id] = [];
+      map[m.review_id].push({ id: m.id, media_type: m.media_type, file_url: m.file_url });
+    }
+    for (const r of rows) r.media = map[r.id] || [];
+  } catch (e) {
+    if (e.code === 'ER_NO_SUCH_TABLE') for (const r of rows) r.media = [];
+    else throw e;
+  }
+}
 
 const Category = {
   async getAll() {
     const [rows] = await db.query(
-      `SELECT c.*, COUNT(p.id) as product_count
+      `SELECT c.id, c.name, c.slug, COUNT(p.id) AS product_count
        FROM categories c
        LEFT JOIN products p ON p.category_id = c.id AND p.status = 'active'
-       GROUP BY c.id ORDER BY c.name`
+       GROUP BY c.id, c.name, c.slug
+       ORDER BY c.name`
     );
     return rows;
   },
@@ -32,10 +54,11 @@ const Category = {
 const Brand = {
   async getAll() {
     const [rows] = await db.query(
-      `SELECT b.*, COUNT(p.id) as product_count
+      `SELECT b.id, b.name, b.slug, b.logo, b.description, COUNT(p.id) AS product_count
        FROM brands b
        LEFT JOIN products p ON p.brand_id = b.id AND p.status = 'active'
-       GROUP BY b.id ORDER BY b.name`
+       GROUP BY b.id, b.name, b.slug, b.logo, b.description
+       ORDER BY b.name`
     );
     return rows;
   },
@@ -87,7 +110,13 @@ const Cart = {
        FROM cart_items ci
        LEFT JOIN products p ON ci.product_id = p.id
        LEFT JOIN product_variants pv ON ci.variant_id = pv.id
-       LEFT JOIN product_images img ON img.product_id = p.id AND img.is_main = 1
+       LEFT JOIN product_images img ON img.id = (
+         SELECT pi.id
+         FROM product_images pi
+         WHERE pi.product_id = p.id
+         ORDER BY pi.is_main DESC, pi.id ASC
+         LIMIT 1
+       )
        LEFT JOIN brands b ON p.brand_id = b.id
        WHERE ci.cart_id = ?`,
       [cartId]
@@ -149,6 +178,7 @@ const Review = {
        LIMIT ? OFFSET ?`,
       [productId, parseInt(limit), offset]
     );
+    await attachReviewMediaToRows(rows);
     const [[{ total }]] = await db.query(
       "SELECT COUNT(*) as total FROM reviews WHERE product_id = ? AND status = 'visible'",
       [productId]
@@ -160,19 +190,47 @@ const Review = {
     return { rows, total, avg_rating: parseFloat(stats.avg_rating || 0).toFixed(1) };
   },
 
-  async create({ user_id, product_id, rating, comment }) {
-    // Kiểm tra đã review chưa
-    const [existing] = await db.query(
-      'SELECT id FROM reviews WHERE user_id = ? AND product_id = ?',
+  async hasUserReviewed(user_id, product_id) {
+    const [rows] = await db.query(
+      'SELECT id FROM reviews WHERE user_id = ? AND product_id = ? LIMIT 1',
       [user_id, product_id]
     );
-    if (existing.length) throw new Error('Bạn đã đánh giá sản phẩm này rồi');
+    return rows.length > 0;
+  },
 
-    const [r] = await db.query(
-      "INSERT INTO reviews (user_id, product_id, rating, comment, status) VALUES (?, ?, ?, ?, 'visible')",
-      [user_id, product_id, rating, comment]
-    );
-    return r.insertId;
+  /** mediaItems: { file_url, media_type }[] — image | video */
+  async create({ user_id, product_id, rating, comment, mediaItems = [] }) {
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [existing] = await conn.query(
+        'SELECT id FROM reviews WHERE user_id = ? AND product_id = ?',
+        [user_id, product_id]
+      );
+      if (existing.length) {
+        await conn.rollback();
+        throw new Error('Bạn đã đánh giá sản phẩm này rồi');
+      }
+      const [r] = await conn.query(
+        "INSERT INTO reviews (user_id, product_id, rating, comment, status) VALUES (?, ?, ?, ?, 'visible')",
+        [user_id, product_id, rating, comment]
+      );
+      const reviewId = r.insertId;
+      for (let i = 0; i < mediaItems.length; i++) {
+        const item = mediaItems[i];
+        await conn.query(
+          'INSERT INTO review_media (review_id, media_type, file_url, sort_order) VALUES (?, ?, ?, ?)',
+          [reviewId, item.media_type, item.file_url, i]
+        );
+      }
+      await conn.commit();
+      return reviewId;
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
   },
 
   async adminGetAll({ search = '', minRating, maxRating, page = 1, limit = 10 } = {}) {
@@ -193,12 +251,19 @@ const Review = {
        FROM reviews r
        LEFT JOIN users u ON r.user_id = u.id
        LEFT JOIN products p ON r.product_id = p.id
-       LEFT JOIN product_images img ON img.product_id = p.id AND img.is_main = 1
+       LEFT JOIN product_images img ON img.id = (
+         SELECT pi.id
+         FROM product_images pi
+         WHERE pi.product_id = p.id
+         ORDER BY pi.is_main DESC, pi.id ASC
+         LIMIT 1
+       )
        WHERE ${where}
        ORDER BY r.created_at DESC
        LIMIT ? OFFSET ?`,
       [...params, parseInt(limit), offset]
     );
+    await attachReviewMediaToRows(rows);
     const [[{ total }]] = await db.query(
       `SELECT COUNT(*) as total FROM reviews r
        LEFT JOIN users u ON r.user_id = u.id
@@ -215,21 +280,29 @@ const Review = {
   },
 
   async delete(id) {
+    try {
+      const [media] = await db.query('SELECT file_url FROM review_media WHERE review_id = ?', [id]);
+      for (const m of media) unlinkUploadUrl(m.file_url);
+    } catch (e) {
+      if (e.code !== 'ER_NO_SUCH_TABLE') throw e;
+    }
     await db.query('DELETE FROM reviews WHERE id = ?', [id]);
     return true;
   },
 };
 
 const Blog = {
-  async getAll({ search = '', category = '', page = 1, limit = 9 } = {}) {
+  async getAll({ search = '', category = '', status = '', page = 1, limit = 9, onlyPublished = false } = {}) {
     const offset = (page - 1) * limit;
     const conditions = ['1=1'];
     const params = [];
+    if (onlyPublished) conditions.push("b.status = 'published'");
+    else if (status) { conditions.push('b.status = ?'); params.push(status); }
     if (search) { conditions.push('b.title LIKE ?'); params.push(`%${search}%`); }
     if (category) { conditions.push('(bc.slug = ? OR bc.id = ?)'); params.push(category, category); }
     const where = conditions.join(' AND ');
     const [rows] = await db.query(
-      `SELECT b.id, b.title, b.slug, b.thumbnail, b.created_at,
+      `SELECT b.id, b.title, b.slug, b.thumbnail, b.status, b.created_at,
               bc.name as category_name, bc.slug as category_slug,
               u.name as author_name
        FROM blogs b
@@ -249,28 +322,30 @@ const Blog = {
     return { rows, total };
   },
 
-  async getBySlug(slug) {
-    const [rows] = await db.query(
-      `SELECT b.*, bc.name as category_name, bc.slug as category_slug, u.name as author_name
+  async getBySlug(slug, { onlyPublished = false } = {}) {
+    let sql = `SELECT b.*, bc.name as category_name, bc.slug as category_slug, u.name as author_name
        FROM blogs b
        LEFT JOIN blog_categories bc ON b.category_id = bc.id
        LEFT JOIN users u ON b.author_id = u.id
-       WHERE b.slug = ? LIMIT 1`,
-      [slug]
-    );
+       WHERE b.slug = ?`;
+    const params = [slug];
+    if (onlyPublished) sql += " AND b.status = 'published'";
+    sql += ' LIMIT 1';
+    const [rows] = await db.query(sql, params);
     return rows[0] || null;
   },
 
-  async create({ title, slug, content, author_id, category_id, thumbnail }) {
+  async create({ title, slug, content, author_id, category_id, thumbnail, status = 'published' }) {
+    const st = ['published', 'draft', 'hidden'].includes(status) ? status : 'published';
     const [r] = await db.query(
-      'INSERT INTO blogs (title, slug, content, author_id, category_id, thumbnail) VALUES (?, ?, ?, ?, ?, ?)',
-      [title, slug, content, author_id, category_id, thumbnail]
+      'INSERT INTO blogs (title, slug, content, author_id, category_id, thumbnail, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [title, slug, content, author_id, category_id, thumbnail, st]
     );
     return r.insertId;
   },
 
   async update(id, fields) {
-    const allowed = ['title', 'slug', 'content', 'category_id', 'thumbnail'];
+    const allowed = ['title', 'slug', 'content', 'category_id', 'thumbnail', 'status'];
     const updates = [], values = [];
     for (const k of allowed) {
       if (fields[k] !== undefined) { updates.push(`${k} = ?`); values.push(fields[k]); }
@@ -300,7 +375,13 @@ const Wishlist = {
        FROM wishlists w
        LEFT JOIN products p ON w.product_id = p.id
        LEFT JOIN brands b ON p.brand_id = b.id
-       LEFT JOIN product_images img ON img.product_id = p.id AND img.is_main = 1
+       LEFT JOIN product_images img ON img.id = (
+         SELECT pi.id
+         FROM product_images pi
+         WHERE pi.product_id = p.id
+         ORDER BY pi.is_main DESC, pi.id ASC
+         LIMIT 1
+       )
        WHERE w.user_id = ? ORDER BY w.created_at DESC`,
       [userId]
     );
@@ -323,41 +404,64 @@ const Wishlist = {
 };
 
 const Voucher = {
-  async check(code, userId, orderValue) {
+  async _loadValid(whereSql, params) {
     const [rows] = await db.query(
       `SELECT v.* FROM vouchers v
-       WHERE v.code = ?
+       WHERE ${whereSql}
          AND v.start_date <= NOW()
-         AND v.end_date >= NOW()
+         AND (v.end_date IS NULL OR v.end_date >= NOW())
          AND v.quantity > 0
        LIMIT 1`,
-      [code]
+      params
     );
-    if (!rows.length) throw new Error('Mã giảm giá không hợp lệ hoặc đã hết hạn');
-    const voucher = rows[0];
+    return rows[0] || null;
+  },
 
-    if (orderValue < voucher.min_order_value) {
-      throw new Error(`Đơn hàng tối thiểu ${voucher.min_order_value.toLocaleString()}đ để dùng mã này`);
+  _discountForOrder(voucher, orderValue) {
+    const min = Number(voucher.min_order_value) || 0;
+    if (orderValue < min) {
+      throw new Error(`Đơn hàng tối thiểu ${min.toLocaleString('vi-VN')}đ để dùng mã này`);
     }
+    let discountAmount = 0;
+    if (voucher.discount_type === 'percent') {
+      discountAmount = (orderValue * Number(voucher.discount_value)) / 100;
+      if (voucher.max_discount != null && discountAmount > Number(voucher.max_discount)) {
+        discountAmount = Number(voucher.max_discount);
+      }
+    } else {
+      discountAmount = Number(voucher.discount_value);
+    }
+    return discountAmount;
+  },
 
-    // Kiểm tra đã dùng chưa
+  async check(code, userId, orderValue) {
+    const voucher = await Voucher._loadValid('v.code = ?', [String(code).trim()]);
+    if (!voucher) throw new Error('Mã giảm giá không hợp lệ hoặc đã hết hạn');
+
     const [used] = await db.query(
       'SELECT id FROM voucher_usage WHERE voucher_id = ? AND user_id = ?',
       [voucher.id, userId]
     );
     if (used.length) throw new Error('Bạn đã sử dụng mã này rồi');
 
-    // Tính discount
-    let discountAmount = 0;
-    if (voucher.discount_type === 'percent') {
-      discountAmount = (orderValue * voucher.discount_value) / 100;
-      if (voucher.max_discount && discountAmount > voucher.max_discount) {
-        discountAmount = voucher.max_discount;
-      }
-    } else {
-      discountAmount = voucher.discount_value;
-    }
+    const discountAmount = Voucher._discountForOrder(voucher, orderValue);
+    return { voucher, discountAmount };
+  },
 
+  /** Dùng khi đặt hàng: frontend gửi voucher_id sau bước check mã */
+  async validateById(voucherId, userId, orderValue) {
+    const id = parseInt(voucherId, 10);
+    if (!id) throw new Error('Mã giảm giá không hợp lệ hoặc đã hết hạn');
+    const voucher = await Voucher._loadValid('v.id = ?', [id]);
+    if (!voucher) throw new Error('Mã giảm giá không hợp lệ hoặc đã hết hạn');
+
+    const [used] = await db.query(
+      'SELECT id FROM voucher_usage WHERE voucher_id = ? AND user_id = ?',
+      [voucher.id, userId]
+    );
+    if (used.length) throw new Error('Bạn đã sử dụng mã này rồi');
+
+    const discountAmount = Voucher._discountForOrder(voucher, orderValue);
     return { voucher, discountAmount };
   },
 };

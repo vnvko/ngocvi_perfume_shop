@@ -1,9 +1,10 @@
 // Admin: Quản lý bài viết blog — danh sách, trạng thái, thêm/sửa/xóa
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FiPlus, FiEye, FiEdit2, FiTrash2, FiSearch } from 'react-icons/fi';
 import { AdminLayout } from '../../../components/admin/AdminLayout';
 import { adminAPI } from '../../../services/api';
+import { mediaUrl } from '../../../utils/mediaUrl';
 
 const STATUS_STYLE = {
   published: 'bg-green-50 text-green-700',
@@ -22,15 +23,15 @@ export default function AdminBlog() {
   const [page, setPage] = useState(1);
   const limit = 10;
 
-  const fetchBlogs = () => {
+  const fetchBlogs = useCallback(() => {
     setLoading(true);
     adminAPI.getBlogs({ search, status: statusFilter, category: categoryFilter, page, limit })
       .then(res => { setPosts(res.data || []); setTotal(res.pagination?.total || 0); })
       .catch(() => setPosts([]))
       .finally(() => setLoading(false));
-  };
+  }, [search, statusFilter, categoryFilter, page, limit]);
 
-  useEffect(() => { fetchBlogs(); }, [search, statusFilter, categoryFilter, page]);
+  useEffect(() => { fetchBlogs(); }, [fetchBlogs]);
 
   const handleDelete = async (id, title) => {
     if (!window.confirm(`Xóa bài viết "${title}"?`)) return;
@@ -95,7 +96,7 @@ export default function AdminBlog() {
                 <td className="py-3 pr-4">
                   <div className="w-16 h-11 rounded-lg overflow-hidden bg-gray-50 flex-shrink-0">
                     {p.thumbnail
-                      ? <img src={p.thumbnail} alt="" className="w-full h-full object-cover" />
+                      ? <img src={mediaUrl(p.thumbnail)} alt="" className="w-full h-full object-cover" />
                       : <div className="w-full h-full bg-gray-100" />
                     }
                   </div>

@@ -1,8 +1,8 @@
 // Context quản lý giỏ hàng và wishlist — đồng bộ với backend khi đã đăng nhập
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useState, useEffect, useCallback } from 'react';
 import { cartAPI, wishlistAPI, productAPI } from '../services/api';
 
-const CartContext = createContext(null);
+export const CartContext = createContext(null);
 
 export function CartProvider({ children }) {
   const [cartItems, setCartItems]     = useState([]);
@@ -158,5 +158,3 @@ export function CartProvider({ children }) {
     </CartContext.Provider>
   );
 }
-
-export const useCart = () => useContext(CartContext);

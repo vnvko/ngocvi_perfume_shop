@@ -86,7 +86,7 @@ const AuthController = {
   async updateProfile(req, res) {
     try {
       const { name, phone } = req.body;
-      const avatar = req.file ? `/uploads/${req.file.filename}` : undefined;
+      const avatar = req.file ? `/uploads/avatars/${req.file.filename}` : undefined;
       await User.updateProfile(req.user.id, { name, phone, avatar });
       const user = await User.findById(req.user.id);
       return success(res, { user }, 'Cập nhật thông tin thành công');

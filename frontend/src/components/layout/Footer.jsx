@@ -30,8 +30,8 @@ export default function Footer() {
             <ul className="space-y-3">
               <li><Link to="/products?category=nuoc-hoa-nam" className="text-muted text-sm font-sans hover:text-white transition-colors">{"Nước Hoa Nam"}</Link></li>
               <li><Link to="/products?category=nuoc-hoa-nu" className="text-muted text-sm font-sans hover:text-white transition-colors">{"Nước Hoa Nữ"}</Link></li>
-              <li><Link to="/products?category=unisex" className="text-muted text-sm font-sans hover:text-white transition-colors">{"UNISEX"}</Link></li>
-              <li><Link to="/products" className="text-muted text-sm font-sans hover:text-white transition-colors">Best Sellers</Link></li>
+              <li><Link to="/products?category=unisex" className="text-muted text-sm font-sans hover:text-white transition-colors">{"PHI GIỚI TÍNH"}</Link></li>
+              <li><Link to="/products" className="text-muted text-sm font-sans hover:text-white transition-colors">Sản phẩm bán chạy</Link></li>
               <li><Link to="/blog" className="text-muted text-sm font-sans hover:text-white transition-colors">{"BLOG"}</Link></li>
             </ul>
           </div>
@@ -53,7 +53,7 @@ export default function Footer() {
             <h4 className="text-xs tracking-widest uppercase font-sans font-medium mb-5 text-light-secondary">{"Đăng Ký Nhận Tin"}</h4>
             <p className="text-muted text-sm font-sans mb-4 leading-relaxed">{"Nhận thông tin ưu đãi và xu hướng mới nhất."}</p>
             <form onSubmit={e => e.preventDefault()} className="flex flex-col gap-2">
-              <input type="Email" placeholder={"emailPlaceholder"}
+              <input type="Email" placeholder={"Email của bạn"}
                 className="bg-transparent border border-muted/30 text-white px-4 py-2.5 text-sm font-sans outline-none placeholder:text-muted focus:border-primary transition-colors" />
               <button type="submit" className="bg-primary text-white text-xs tracking-widest uppercase font-sans py-2.5 hover:bg-primary-dark transition-colors">
                 {"Đăng Ký"}

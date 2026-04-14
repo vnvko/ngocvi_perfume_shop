@@ -3,11 +3,12 @@ import axios from 'axios';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+export { mediaUrl, API_ORIGIN } from '../utils/mediaUrl';
+
 // Tạo axios instance
 const api = axios.create({
   baseURL: BASE_URL,
   timeout: 15000,
-  headers: { 'Content-Type': 'application/json' },
 });
 
 // ── Request Interceptor: tự động đính kèm JWT token ──
@@ -22,7 +23,13 @@ api.interceptors.request.use(
 
 // ── Response Interceptor: xử lý lỗi chung ──
 api.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    const payload = response.data;
+    if (Array.isArray(payload)) {
+      return { data: payload, status: response.status, headers: response.headers };
+    }
+    return { ...payload, status: response.status, headers: response.headers };
+  },
   (error) => {
     const message = error.response?.data?.message || 'Đã xảy ra lỗi, vui lòng thử lại';
     if (error.response?.status === 401) {
@@ -34,6 +41,17 @@ api.interceptors.response.use(
   }
 );
 
+const buildFormData = (data) => {
+  if (data instanceof FormData) return data;
+  const form = new FormData();
+  Object.entries(data || {}).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) {
+      form.append(k, v);
+    }
+  });
+  return form;
+};
+
 // ══════════════════════════════════════
 //  AUTH
 // ══════════════════════════════════════
@@ -44,7 +62,7 @@ export const authAPI = {
   updateProfile: (data) => {
     const form = new FormData();
     Object.entries(data).forEach(([k, v]) => { if (v !== undefined) form.append(k, v); });
-    return api.put('/auth/profile', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return api.put('/auth/profile', form);
   },
   changePassword: (data) => api.put('/auth/change-password', data),
 };
@@ -85,6 +103,9 @@ export const orderAPI = {
 // ══════════════════════════════════════
 export const reviewAPI = {
   getByProduct: (productId, params) => api.get(`/reviews/${productId}`, { params }),
+  /** Đăng nhập — { canReview, alreadyReviewed, hasPurchased } */
+  getEligibility: (productId) => api.get(`/reviews/eligibility/${productId}`),
+  /** FormData: product_id, rating, comment, media[] (ảnh/video, tối đa 5 file, mỗi file ≤30MB) */
   create: (data) => api.post('/reviews', data),
 };
 
@@ -134,21 +155,22 @@ export const adminAPI = {
     Object.entries(data).forEach(([k, v]) => {
       if (v !== undefined) {
         if (k === 'images') v.forEach(f => form.append('images', f));
-        else if (k === 'variants') form.append(k, JSON.stringify(v));
+        else if (k === 'variants' || k === 'tags') form.append(k, JSON.stringify(v));
         else form.append(k, v);
       }
     });
-    return api.post('/admin/products', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return api.post('/admin/products', form);
   },
   updateProduct: (id, data) => {
     const form = new FormData();
     Object.entries(data).forEach(([k, v]) => {
       if (v !== undefined) {
         if (k === 'images') v.forEach(f => form.append('images', f));
+        else if (k === 'variants' || k === 'tags') form.append(k, JSON.stringify(v));
         else form.append(k, v);
       }
     });
-    return api.put(`/admin/products/${id}`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return api.put(`/admin/products/${id}`, form);
   },
   deleteProduct: (id) => api.delete(`/admin/products/${id}`),
   updateVariant: (productId, variantId, data) => api.put(`/admin/products/${productId}/variants/${variantId}`, data),
@@ -164,16 +186,8 @@ export const adminAPI = {
 
   // Brands
   getBrands: () => api.get('/admin/brands'),
-  createBrand: (data) => {
-    const form = new FormData();
-    Object.entries(data).forEach(([k, v]) => { if (v !== undefined) form.append(k, v); });
-    return api.post('/admin/brands', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-  },
-  updateBrand: (id, data) => {
-    const form = new FormData();
-    Object.entries(data).forEach(([k, v]) => { if (v !== undefined) form.append(k, v); });
-    return api.put(`/admin/brands/${id}`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
-  },
+  createBrand: (data) => api.post('/admin/brands', buildFormData(data)),
+  updateBrand: (id, data) => api.put(`/admin/brands/${id}`, buildFormData(data)),
   deleteBrand: (id) => api.delete(`/admin/brands/${id}`),
 
   // Inventory
@@ -196,23 +210,13 @@ export const adminAPI = {
   // Reviews
   getReviews: (params) => api.get('/admin/reviews', { params }),
   updateReviewStatus: (id, status) => api.put(`/admin/reviews/${id}/status`, { status }),
-    createUser: (data) => api.post('/admin/users', data),
-  getUserOrders: (id) => api.get(`/admin/users/${id}/orders`),
   deleteReview: (id) => api.delete(`/admin/reviews/${id}`),
 
   // Blog
   getBlogs: (params) => api.get('/admin/blogs', { params }),
   getBlog: (id) => api.get(`/admin/blogs/${id}`),
-  createBlog: (data) => {
-    const form = new FormData();
-    Object.entries(data).forEach(([k, v]) => { if (v !== undefined) form.append(k, v); });
-    return api.post('/admin/blogs', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-  },
-  updateBlog: (id, data) => {
-    const form = new FormData();
-    Object.entries(data).forEach(([k, v]) => { if (v !== undefined) form.append(k, v); });
-    return api.put(`/admin/blogs/${id}`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
-  },
+  createBlog: (data) => api.post('/admin/blogs', buildFormData(data)),
+  updateBlog: (id, data) => api.put(`/admin/blogs/${id}`, buildFormData(data)),
   deleteBlog: (id) => api.delete(`/admin/blogs/${id}`),
 
   // Chatbox
@@ -222,16 +226,8 @@ export const adminAPI = {
 
   // Banners
   getBanners: () => api.get('/admin/banners'),
-  createBanner: (data) => {
-    const form = new FormData();
-    Object.entries(data).forEach(([k, v]) => { if (v !== undefined) form.append(k, v); });
-    return api.post('/admin/banners', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-  },
-  updateBanner: (id, data) => {
-    const form = new FormData();
-    Object.entries(data).forEach(([k, v]) => { if (v !== undefined) form.append(k, v); });
-    return api.put(`/admin/banners/${id}`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
-  },
+  createBanner: (data) => api.post('/admin/banners', buildFormData(data)),
+  updateBanner: (id, data) => api.put(`/admin/banners/${id}`, buildFormData(data)),
   deleteBanner: (id) => api.delete(`/admin/banners/${id}`),
 };
 
@@ -248,14 +244,8 @@ export const addressAPI = {
 
 
 export const adminVoucherAPI = {
-  getAll:  (params) => api.get('/admin/vouchers', { params }),
-  create:  (data)   => api.post('/admin/vouchers', data),
-  update:  (id, data) => api.put(`/admin/vouchers/${id}`, data),
-  delete:  (id)     => api.delete(`/admin/vouchers/${id}`),
-  toggle:  (id)     => api.patch(`/admin/vouchers/${id}/toggle`),
+  getAll: (params) => api.get('/admin/vouchers', { params }),
+  create: (data) => api.post('/admin/vouchers', data),
+  update: (id, data) => api.put(`/admin/vouchers/${id}`, data),
+  delete: (id) => api.delete(`/admin/vouchers/${id}`),
 };
-
-// Extra admin API helpers (patch)
-if (typeof window !== 'undefined') {
-  // Patch adminAPI with missing methods at runtime if needed
-}

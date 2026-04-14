@@ -2,8 +2,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FiHeart, FiShoppingBag, FiCheck } from 'react-icons/fi';
-import { useCart } from '../../context/CartContext';
-import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../hooks/useCart';
+import { useAuth } from '../../hooks/useAuth';
+import { mediaUrl } from '../../utils/mediaUrl';
 
 const fmtPrice = (n) => new Intl.NumberFormat('vi-VN').format(n || 0) + 'đ';
 
@@ -13,13 +14,13 @@ function getBadge(product, allProducts = []) {
   const now = new Date();
   const created = new Date(product.created_at);
   const daysSince = (now - created) / (1000 * 60 * 60 * 24);
-  if (daysSince <= 30) return { label: 'NEW', color: 'bg-blue-500' };
+  if (daysSince <= 30) return { label: 'MỚI', color: 'bg-blue-500' };
 
   if (allProducts.length > 1 && product.total_sold > 0) {
     const avg = allProducts.reduce((s, p) => s + (p.total_sold || 0), 0) / allProducts.length;
-    if (avg > 0 && product.total_sold >= avg * 1.7) return { label: 'HOT', color: 'bg-red-500' };
+    if (avg > 0 && product.total_sold >= avg * 1.7) return { label: 'NỔI BẬT', color: 'bg-red-500' };
   } else if (product.total_sold >= 10) {
-    return { label: 'HOT', color: 'bg-red-500' };
+    return { label: 'NỔI BẬT', color: 'bg-red-500' };
   }
   return null;
 }
@@ -62,10 +63,10 @@ export default function ProductCard({ product, allProducts = [] }) {
       <div className="overflow-hidden bg-light-secondary aspect-square relative">
         <Link to={`/products/${product.slug}`}>
           {thumbnail ? (
-            <img src={thumbnail} alt={product.name} loading="lazy"
+            <img src={mediaUrl(thumbnail)} alt={product.name} loading="lazy"
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted text-xs font-sans">No Image</div>
+            <div className="w-full h-full flex items-center justify-center text-muted text-xs font-sans">Chưa có ảnh</div>
           )}
         </Link>
 

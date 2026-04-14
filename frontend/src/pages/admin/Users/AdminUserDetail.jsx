@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { FiLock, FiMail, FiPhone, FiMapPin, FiCalendar } from 'react-icons/fi';
 import { AdminLayout } from '../../../components/admin/AdminLayout';
 import { adminAPI } from '../../../services/api';
+import { mediaUrl } from '../../../utils/mediaUrl';
 
 const fmtPrice = (n) => new Intl.NumberFormat('vi-VN').format(n || 0) + 'đ';
 const statusMap = { shipping: ['badge-blue','Đang giao'], pending: ['badge-yellow','Chờ xử lý'], completed: ['badge-green','Hoàn thành'], cancelled: ['badge-red','Đã hủy'] };
@@ -71,7 +72,7 @@ export default function AdminUserDetail() {
           {/* Profile */}
           <div className="card text-center">
             {user.avatar ? (
-              <img src={user.avatar} alt={user.name} className="w-20 h-20 rounded-full object-cover mx-auto mb-3" />
+              <img src={mediaUrl(user.avatar)} alt={user.name} className="w-20 h-20 rounded-full object-cover mx-auto mb-3" />
             ) : (
               <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-serif mx-auto mb-3">
                 {user.name?.charAt(0)?.toUpperCase()}

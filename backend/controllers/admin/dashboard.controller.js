@@ -68,7 +68,13 @@ const DashboardController = {
          FROM order_items oi
          LEFT JOIN products p ON oi.product_id = p.id
          LEFT JOIN brands b ON p.brand_id = b.id
-         LEFT JOIN product_images img ON img.product_id = p.id AND img.is_main = 1
+         LEFT JOIN product_images img ON img.id = (
+           SELECT pi.id
+           FROM product_images pi
+           WHERE pi.product_id = p.id
+           ORDER BY pi.is_main DESC, pi.id ASC
+           LIMIT 1
+         )
          LEFT JOIN orders o ON oi.order_id = o.id
          WHERE o.status != 'cancelled'
          GROUP BY p.id

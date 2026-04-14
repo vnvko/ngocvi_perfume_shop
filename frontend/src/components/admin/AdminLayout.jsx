@@ -5,26 +5,46 @@ import {
   FiGrid, FiTag, FiLayers, FiShoppingCart, FiArchive,
   FiUsers, FiStar, FiFileText, FiMessageSquare, FiBarChart2,
   FiBell, FiSearch, FiLogOut, FiUser, FiExternalLink, FiPercent,
-  FiChevronDown, FiX, FiPackage, FiDollarSign
+  FiChevronDown, FiX, FiPackage, FiDollarSign, FiImage
 } from 'react-icons/fi';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { adminAPI } from '../../services/api';
+import { mediaUrl } from '../../utils/mediaUrl';
 
 const navItems = [
   { to: '/admin',            label: 'Dashboard',         icon: FiGrid,        end: true },
   { to: '/admin/products',   label: 'Quản lý sản phẩm',  icon: FiTag },
   { to: '/admin/categories', label: 'Quản lý danh mục',  icon: FiLayers },
+  { to: '/admin/brands',     label: 'Quản lý thương hiệu', icon: FiPackage },
+  { to: '/admin/banners',    label: 'Quản lý banner',    icon: FiImage },
   { to: '/admin/orders',     label: 'Quản lý đơn hàng',  icon: FiShoppingCart },
   { to: '/admin/inventory',  label: 'Quản lý kho',        icon: FiArchive },
   { to: '/admin/users',      label: 'Người dùng',         icon: FiUsers },
   { to: '/admin/reviews',    label: 'Đánh giá',           icon: FiStar },
-  { to: '/admin/blog',       label: 'Blog',               icon: FiFileText },
+  { to: '/admin/blog',       label: 'Bài viết',               icon: FiFileText },
   { to: '/admin/vouchers',   label: 'Voucher',             icon: FiPercent },
   { to: '/admin/chatbox',    label: 'Chatbox',            icon: FiMessageSquare },
   { to: '/admin/stats',      label: 'Thống kê',           icon: FiBarChart2 },
 ];
 
 const NOTIF_TYPES = { order: '🛒', review: '⭐', user: '👤', system: '⚙️' };
+
+const adminReadKey = (userId) => `ngocvi_admin_read_u${userId || 0}`;
+
+function formatRelativeTime(iso) {
+  if (!iso) return '';
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return '';
+  const diff = Date.now() - t;
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'Vừa xong';
+  if (m < 60) return `${m} phút trước`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} giờ trước`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d} ngày trước`;
+  return new Date(iso).toLocaleDateString('vi-VN');
+}
 
 export function AdminLayout({ children, breadcrumb }) {
   const { user, logout } = useAuth();
@@ -35,18 +55,63 @@ export function AdminLayout({ children, breadcrumb }) {
   const [searchQ, setSearchQ]     = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [notifications, setNotifications] = useState([
-    { id: 1, type: 'order',  text: 'Đơn hàng #NGV-001 mới vừa được đặt',    time: '2 phút trước',   read: false },
-    { id: 2, type: 'review', text: 'Đánh giá mới cho Dior Sauvage EDP',      time: '15 phút trước',  read: false },
-    { id: 3, type: 'user',   text: 'Khách hàng mới đăng ký tài khoản',       time: '1 giờ trước',    read: false },
-    { id: 4, type: 'order',  text: 'Đơn hàng #NGV-002 đã hoàn thành',        time: '2 giờ trước',    read: true  },
-    { id: 5, type: 'system', text: 'Cập nhật hệ thống thành công',            time: '1 ngày trước',   read: true  },
-  ]);
+  const [notifications, setNotifications] = useState([]);
 
   const notifRef = useRef(null);
   const userRef  = useRef(null);
   const searchRef = useRef(null);
   const unread = notifications.filter(n => !n.read).length;
+
+  useEffect(() => {
+    const uid = user?.id;
+    const load = async () => {
+      try {
+        const [ordRes, revRes] = await Promise.all([
+          adminAPI.getRecentOrders(10),
+          adminAPI.getReviews({ limit: 10, page: 1 }),
+        ]);
+        const orders = ordRes.data?.orders || [];
+        const revRows = Array.isArray(revRes.data) ? revRes.data : [];
+        const readIds = new Set(JSON.parse(localStorage.getItem(adminReadKey(uid)) || '[]'));
+        const items = [];
+
+        const statusLabel = (s) =>
+          ({ pending: 'Chờ xử lý', confirmed: 'Đã xác nhận', shipping: 'Đang giao', completed: 'Hoàn thành', cancelled: 'Đã hủy' }[s] || s);
+
+        orders.forEach((o) => {
+          const id = `order-${o.id}-${o.status}`;
+          items.push({
+            id,
+            type: 'order',
+            text: `Đơn ${o.order_code} — ${statusLabel(o.status)}${o.customer_name ? ` · ${o.customer_name}` : ''}`,
+            time: formatRelativeTime(o.created_at),
+            sortAt: o.created_at,
+            read: readIds.has(id),
+            link: `/admin/orders/${o.id}`,
+          });
+        });
+        revRows.forEach((r) => {
+          const id = `review-${r.id}`;
+          items.push({
+            id,
+            type: 'review',
+            text: `${r.user_name || 'Khách'} đánh giá ${r.rating}★ — ${r.product_name || 'Sản phẩm'}`,
+            time: formatRelativeTime(r.created_at),
+            sortAt: r.created_at,
+            read: readIds.has(id),
+            link: '/admin/reviews',
+          });
+        });
+        items.sort((a, b) => new Date(b.sortAt || 0) - new Date(a.sortAt || 0));
+        setNotifications(items.slice(0, 16));
+      } catch {
+        setNotifications([]);
+      }
+    };
+    load();
+    const t = setInterval(load, 120000);
+    return () => clearInterval(t);
+  }, [user?.id]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -80,8 +145,29 @@ export function AdminLayout({ children, breadcrumb }) {
     return () => clearTimeout(t);
   }, [searchQ]);
 
-  const markAllRead = () => setNotifications(n => n.map(x => ({ ...x, read: true })));
-  const markRead    = (id) => setNotifications(n => n.map(x => x.id === id ? { ...x, read: true } : x));
+  const markAllRead = () => {
+    if (!user?.id) return;
+    const key = adminReadKey(user.id);
+    const ids = notifications.map((x) => x.id);
+    const merged = [...new Set([...JSON.parse(localStorage.getItem(key) || '[]'), ...ids])];
+    localStorage.setItem(key, JSON.stringify(merged));
+    setNotifications((n) => n.map((x) => ({ ...x, read: true })));
+  };
+
+  const markRead = (id) => {
+    if (!user?.id) return;
+    const key = adminReadKey(user.id);
+    const cur = JSON.parse(localStorage.getItem(key) || '[]');
+    if (!cur.includes(id)) localStorage.setItem(key, JSON.stringify([...cur, id]));
+    setNotifications((n) => n.map((x) => (x.id === id ? { ...x, read: true } : x)));
+  };
+
+  const onNotifRowClick = (n) => {
+    markRead(n.id);
+    navigate(n.link);
+    setShowNotif(false);
+  };
+
   const handleLogout = () => { logout(); navigate('/login'); };
 
   return (
@@ -111,7 +197,7 @@ export function AdminLayout({ children, breadcrumb }) {
           <div className="border-t border-white/10 mt-3 pt-3">
             <Link to="/" target="_blank"
               className="flex items-center gap-3 px-3 py-2.5 text-xs font-medium rounded-md text-gray-400 hover:text-white hover:bg-sidebar-hover transition-all">
-              <FiExternalLink size={15} /> Về trang Store
+              <FiExternalLink size={15} /> Về trang cửa hàng
             </Link>
           </div>
         </nav>
@@ -119,7 +205,7 @@ export function AdminLayout({ children, breadcrumb }) {
         <div className="px-4 py-4 border-t border-white/10">
           <div className="flex items-center gap-3">
             {user?.avatar
-              ? <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+              ? <img src={mediaUrl(user.avatar)} alt={user.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
               : <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-semibold flex-shrink-0">
                   {user?.name?.charAt(0)?.toUpperCase() || 'A'}
                 </div>
@@ -220,17 +306,21 @@ export function AdminLayout({ children, breadcrumb }) {
                     </div>
                   </div>
                   <div className="max-h-72 overflow-y-auto">
-                    {notifications.map(n => (
-                      <button key={n.id} onClick={() => markRead(n.id)}
-                        className={`w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 ${!n.read ? 'bg-primary/5' : ''}`}>
-                        <span className="text-base flex-shrink-0 mt-0.5">{NOTIF_TYPES[n.type] || '📌'}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-xs leading-relaxed ${!n.read ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>{n.text}</p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">{n.time}</p>
-                        </div>
-                        {!n.read && <span className="w-2 h-2 bg-primary rounded-full flex-shrink-0 mt-1.5" />}
-                      </button>
-                    ))}
+                    {notifications.length === 0 ? (
+                      <div className="px-4 py-8 text-center text-xs text-gray-400">Chưa có đơn hoặc đánh giá gần đây</div>
+                    ) : (
+                      notifications.map((n) => (
+                        <button key={n.id} type="button" onClick={() => onNotifRowClick(n)}
+                          className={`w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 ${!n.read ? 'bg-primary/5' : ''}`}>
+                          <span className="text-base flex-shrink-0 mt-0.5">{NOTIF_TYPES[n.type] || '📌'}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-xs leading-relaxed ${!n.read ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>{n.text}</p>
+                            <p className="text-[10px] text-gray-400 mt-0.5">{n.time}</p>
+                          </div>
+                          {!n.read && <span className="w-2 h-2 bg-primary rounded-full flex-shrink-0 mt-1.5" />}
+                        </button>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
@@ -241,7 +331,7 @@ export function AdminLayout({ children, breadcrumb }) {
               <button onClick={() => { setShowUser(s => !s); setShowNotif(false); }}
                 className="flex items-center gap-1.5 hover:bg-gray-50 px-2 py-1 rounded-lg transition-colors">
                 {user?.avatar
-                  ? <img src={user.avatar} alt={user.name} className="w-7 h-7 rounded-full object-cover" />
+                  ? <img src={mediaUrl(user.avatar)} alt={user.name} className="w-7 h-7 rounded-full object-cover" />
                   : <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-semibold">
                       {user?.name?.charAt(0)?.toUpperCase() || 'A'}
                     </div>
@@ -261,7 +351,7 @@ export function AdminLayout({ children, breadcrumb }) {
                   <div className="py-1">
                     <Link to="/" target="_blank" onClick={() => setShowUser(false)}
                       className="flex items-center gap-2.5 px-4 py-2 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
-                      <FiExternalLink size={13} /> Xem trang Store
+                      <FiExternalLink size={13} /> Xem trang cửa hàng
                     </Link>
                     <Link to="/profile" onClick={() => setShowUser(false)}
                       className="flex items-center gap-2.5 px-4 py-2 text-xs text-gray-600 hover:bg-gray-50 transition-colors">

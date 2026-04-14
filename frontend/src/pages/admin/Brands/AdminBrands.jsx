@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { FiPlus, FiEdit2, FiTrash2, FiX, FiUpload } from 'react-icons/fi';
 import { AdminLayout } from '../../../components/admin/AdminLayout';
 import { adminAPI } from '../../../services/api';
+import { mediaUrl } from '../../../utils/mediaUrl';
 
 const emptyForm = { name: '', slug: '', description: '' };
 const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-').trim('-');
@@ -32,7 +33,7 @@ export default function AdminBrands() {
   const openEdit = (b) => {
     setEditing(b.id);
     setForm({ name: b.name || '', slug: b.slug || '', description: b.description || '' });
-    setLogo(null); setLogoPreview(b.logo || null); setError(''); setShowForm(true);
+    setLogo(null); setLogoPreview(b.logo ? mediaUrl(b.logo) : null); setError(''); setShowForm(true);
   };
 
   const handleSave = async () => {
@@ -82,7 +83,7 @@ export default function AdminBrands() {
           <div key={b.id} className="card group hover:border-primary hover:shadow-md transition-all">
             <div className="flex items-center gap-3 mb-3">
               {b.logo ? (
-                <img src={b.logo} alt={b.name} className="w-10 h-10 rounded-lg object-contain bg-gray-50 p-1 border border-gray-100" />
+                <img src={mediaUrl(b.logo)} alt={b.name} className="w-10 h-10 rounded-lg object-contain bg-gray-50 p-1 border border-gray-100" />
               ) : (
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-serif text-lg flex-shrink-0">
                   {b.name.charAt(0)}

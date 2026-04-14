@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { FiShare2 } from 'react-icons/fi';
 import { blogAPI } from '../../services/api';
+import { mediaUrl } from '../../utils/mediaUrl';
 
 export default function BlogDetail() {
   const { slug } = useParams();
@@ -35,7 +36,7 @@ export default function BlogDetail() {
         <nav className="text-xs font-sans text-muted flex items-center gap-1.5">
           <Link to="/" className="hover:text-dark">Trang chủ</Link>
           <span>/</span>
-          <Link to="/blog" className="hover:text-dark">Journal</Link>
+          <Link to="/blog" className="hover:text-dark">Bài viết</Link>
           <span>/</span>
           <span className="text-dark truncate max-w-xs">{blog.title}</span>
         </nav>
@@ -54,7 +55,7 @@ export default function BlogDetail() {
 
           {blog.thumbnail && (
             <div className="aspect-video overflow-hidden mb-8">
-              <img src={blog.thumbnail} alt={blog.title} className="w-full h-full object-cover" />
+              <img src={mediaUrl(blog.thumbnail)} alt={blog.title} className="w-full h-full object-cover" />
             </div>
           )}
 
@@ -66,11 +67,11 @@ export default function BlogDetail() {
           {/* Author */}
           <div className="mt-10 pt-6 border-t border-light-secondary flex items-center justify-between">
             <div>
-              <p className="text-[10px] tracking-widest uppercase font-sans text-muted">Written by</p>
+              <p className="text-[10px] tracking-widest uppercase font-sans text-muted">Tác giả</p>
               <p className="font-sans text-sm font-medium text-dark">{blog.author_name}</p>
             </div>
             <button className="flex items-center gap-2 text-xs tracking-widest uppercase font-sans text-muted hover:text-dark transition-colors">
-              <FiShare2 size={13} /> Share
+              <FiShare2 size={13} /> Chia sẻ
             </button>
           </div>
         </div>

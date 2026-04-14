@@ -1,9 +1,10 @@
 // Admin: Quản lý người dùng — danh sách, filter role/status, khóa/mở tài khoản
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FiEye, FiSearch } from 'react-icons/fi';
 import { AdminLayout } from '../../../components/admin/AdminLayout';
 import { adminAPI } from '../../../services/api';
+import { mediaUrl } from '../../../utils/mediaUrl';
 
 const roleBadge = { customer: 'badge-gray', staff: 'badge-blue', admin: 'badge-yellow' };
 
@@ -16,15 +17,15 @@ export default function AdminUsers() {
   const [page, setPage] = useState(1);
   const limit = 10;
 
-  const fetchUsers = () => {
+  const fetchUsers = useCallback(() => {
     setLoading(true);
     adminAPI.getUsers({ search, role: roleFilter, page, limit })
       .then(res => { setUsers(res.data || []); setTotal(res.pagination?.total || 0); })
       .catch(() => setUsers([]))
       .finally(() => setLoading(false));
-  };
+  }, [search, roleFilter, page, limit]);
 
-  useEffect(() => { fetchUsers(); }, [search, roleFilter, page]);
+  useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   const toggleStatus = async (id, current) => {
     try {
@@ -80,7 +81,7 @@ export default function AdminUsers() {
                 <td className="py-3 pr-4">
                   <div className="flex items-center gap-2.5">
                     {u.avatar ? (
-                      <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full object-cover" />
+                      <img src={mediaUrl(u.avatar)} alt={u.name} className="w-8 h-8 rounded-full object-cover" />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">
                         {u.name?.charAt(0)?.toUpperCase()}

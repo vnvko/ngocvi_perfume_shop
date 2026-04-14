@@ -4,6 +4,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { FiFilter, FiX, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import ProductCard from '../../components/Product/ProductCard';
 import { productAPI } from '../../services/api';
+import { mediaUrl } from '../../utils/mediaUrl';
 
 // Sort options — labels via i18n in component
 
@@ -11,7 +12,7 @@ const sizes = ['30ml', '50ml', '60ml', '100ml', '200ml'];
 
 const categoryBanners = {
   'nuoc-hoa-nam': { title: 'NƯỚC HOA NAM', subtitle: 'MẠNH MẼ – LỊCH LÃM – CUỐN HÚT', image: 'https://images.unsplash.com/photo-1585386959984-a4155224a1ad?w=1400&q=80' },
-  'nuoc-hoa-nu': { title: 'NƯỚC HOA NỮ', subtitle: 'QUYẾN RŨ – THANH LỊCH – ĐỘC ĐÁO', image: 'https://images.unsplash.com/photo-1541643600914-78b084683702?w=1400&q=80' },
+  'nuoc-hoa-nu': { title: 'NƯỚC HOA NỮ', subtitle: 'QUYẾN RŨ – THANH LỊCH – ĐỘC ĐÁO', image: '/uploads/products/1775902581803-570817.jpg' },
   'unisex': { title: 'UNISEX FRAGRANCE', subtitle: 'CÁ TÍNH – ĐỘC ĐÁO – TỰ DO', image: 'https://images.unsplash.com/photo-1563170351-be82bc888aa4?w=1400&q=80' },
 };
 
@@ -48,6 +49,7 @@ export default function ProductList() {
 
   const [sort, setSort] = useState('newest');
   const [selectedBrands, setSelectedBrands] = useState([]);
+  const [selectedGenders, setSelectedGenders] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
   const [priceRange, setPriceRange] = useState(10000000);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
@@ -63,7 +65,8 @@ export default function ProductList() {
       setLoading(true);
       const params = { page, limit: PER_PAGE, sort, search: searchQ };
       if (category && !gender) params.category = category;
-      if (gender) params.gender = gender;
+      if (selectedGenders.length) params.gender = selectedGenders.join(',');
+      else if (gender) params.gender = gender;
       if (selectedBrands.length) params.brand = selectedBrands.join(',');
       if (priceRange < 10000000) params.maxPrice = priceRange;
 
@@ -76,7 +79,12 @@ export default function ProductList() {
     } finally {
       setLoading(false);
     }
-  }, [page, sort, searchQ, category, gender, selectedBrands, priceRange]);
+  }, [page, sort, searchQ, category, gender, selectedBrands, selectedGenders, priceRange]);
+
+  useEffect(() => {
+    setSelectedGenders(gender ? [gender] : []);
+    setPage(1);
+  }, [gender]);
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
@@ -97,9 +105,18 @@ export default function ProductList() {
     <aside className="w-full">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xs tracking-widest uppercase font-sans font-medium">Bộ Lọc</h3>
-        {(selectedBrands.length > 0 || selectedSizes.length > 0) && (
-          <button onClick={() => { setSelectedBrands([]); setSelectedSizes([]); setPriceRange(10000000); setPage(1); }} className="text-[10px] text-primary underline font-sans">
-            Xóa tất cả
+        {(selectedBrands.length > 0 || selectedGenders.length > 0 || selectedSizes.length > 0 || priceRange < 10000000) && (
+          <button
+            onClick={() => {
+              setSelectedBrands([]);
+              setSelectedGenders(gender ? [gender] : []);
+              setSelectedSizes([]);
+              setPriceRange(10000000);
+              setPage(1);
+            }}
+            className="text-[10px] text-primary underline font-sans"
+          >
+            Xóa lọc
           </button>
         )}
       </div>
@@ -128,6 +145,26 @@ export default function ProductList() {
         </div>
       </AccordionFilter>
 
+      <AccordionFilter title="Giới Tính">
+        <div className="space-y-2.5">
+          {[
+            { id: 'male', label: 'Nam' },
+            { id: 'female', label: 'Nữ' },
+            { id: 'unisex', label: 'Unisex' },
+          ].map((g) => (
+            <label key={g.id} className="flex items-center gap-2.5 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={selectedGenders.includes(g.id)}
+                onChange={() => toggleFilter(selectedGenders, setSelectedGenders, g.id)}
+                className="accent-primary w-3.5 h-3.5"
+              />
+              <span className="text-sm font-sans text-dark group-hover:text-primary transition-colors">{g.label}</span>
+            </label>
+          ))}
+        </div>
+      </AccordionFilter>
+
       <AccordionFilter title="Dung Tích">
         <div className="flex flex-wrap gap-2">
           {sizes.map(s => (
@@ -145,7 +182,7 @@ export default function ProductList() {
     <div>
       {banner && (
         <div className="relative h-56 md:h-72 overflow-hidden">
-          <img src={banner.image} alt={banner.title} className="w-full h-full object-cover object-top" />
+          <img src={mediaUrl(banner.image)} alt={banner.title} className="w-full h-full object-cover object-top" />
           <div className="absolute inset-0 bg-dark/50" />
           <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-center">
             <h1 className="font-display text-2xl md:text-4xl tracking-wider">{banner.title}</h1>
@@ -158,7 +195,30 @@ export default function ProductList() {
         <nav className="text-xs font-sans text-muted flex items-center gap-2">
           <Link to="/" className="hover:text-dark transition-colors">Trang chủ</Link>
           <span>/</span>
-          <span className="text-dark">{searchQ ? `Tìm: "${searchQ}"` : (categories.find(c => c.slug === category)?.name || 'Tất cả sản phẩm')}</span>
+          {searchQ ? (
+            <span className="text-dark">{`Tìm: "${searchQ}"`}</span>
+          ) : (
+            <div className="relative group">
+              <span className="text-dark cursor-pointer inline-flex items-center gap-1">
+                {categories.find(c => c.slug === category)?.name || 'Tất cả sản phẩm'}
+                <FiChevronDown size={12} className="text-muted" />
+              </span>
+              <div className="absolute left-0 top-full mt-1 z-20 hidden group-hover:block min-w-48 bg-white border border-light-secondary shadow-md">
+                <Link to="/products" className="block px-3 py-2 text-xs text-dark hover:bg-light-secondary/50">
+                  Tất cả sản phẩm
+                </Link>
+                {categories.map((c) => (
+                  <Link
+                    key={c.id}
+                    to={`/products?category=${c.slug}`}
+                    className="block px-3 py-2 text-xs text-dark hover:bg-light-secondary/50"
+                  >
+                    {c.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </nav>
       </div>
 

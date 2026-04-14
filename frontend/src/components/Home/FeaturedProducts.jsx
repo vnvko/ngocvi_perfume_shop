@@ -4,34 +4,37 @@ import { Link } from 'react-router-dom';
 import ProductCard from '../Product/ProductCard';
 import { productAPI } from '../../services/api';
 
-export default function FeaturedProducts() {
-  const tabs = [
-    { id: 'bestseller', label: "Best Seller", sort: 'popular' },
-    { id: 'new',        label: "New Arrival", sort: 'newest' },
-    { id: 'trending',   label: "Trending",   sort: 'rating' },
-  ];
-  
+const FEATURED_TABS = [
+  { id: 'bestseller', label: 'Bán chạy', sort: 'popular' },
+  { id: 'new', label: 'Mới về', sort: 'newest' },
+  { id: 'trending', label: 'Xu hướng', sort: 'rating' },
+];
 
+export default function FeaturedProducts() {
   const [activeTab, setActiveTab] = useState('bestseller');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    const tab = tabs.find(t => t.id === activeTab);
+    const tab = FEATURED_TABS.find((t) => t.id === activeTab);
     productAPI.getAll({ limit: 4, sort: tab?.sort || 'newest' })
-      .then(res => setProducts(res.data || []))
+      .then((res) => {
+        const raw = res.data;
+        const list = Array.isArray(raw) ? raw : raw?.data;
+        setProducts(Array.isArray(list) ? list : []);
+      })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
   }, [activeTab]);
 
   return (
-    <section className="py-16 max-w-screen-xl mx-auto px-4 md:px-8">
+    <section className="section-space site-container">
       <div className="text-center mb-10">
         <h2 className="section-title">{"Bộ Sưu Tập Nổi Bật"}</h2>
         <div className="w-12 h-px bg-primary mx-auto mt-3 mb-6" />
         <div className="flex items-center justify-center gap-6">
-          {tabs.map(tab => (
+          {FEATURED_TABS.map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={`text-xs tracking-widest uppercase font-sans font-medium pb-1 border-b-[1.5px] transition-all duration-200 ${activeTab === tab.id ? 'text-primary border-primary' : 'text-muted border-transparent hover:text-dark'}`}>
               {tab.label}
@@ -52,7 +55,9 @@ export default function FeaturedProducts() {
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-7">
-          {products.map(p => <ProductCard key={p.id} product={p} allProducts={products} />)}
+          {(Array.isArray(products) ? products : []).map(p => (
+            <ProductCard key={p.id} product={p} allProducts={Array.isArray(products) ? products : []} />
+          ))}
         </div>
       )}
 

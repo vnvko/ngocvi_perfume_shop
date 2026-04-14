@@ -4,6 +4,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { FiSave, FiX, FiUpload, FiArrowLeft } from 'react-icons/fi';
 import { AdminLayout } from '../../../components/admin/AdminLayout';
 import { adminAPI } from '../../../services/api';
+import { mediaUrl } from '../../../utils/mediaUrl';
 
 const slugify = (str) =>
   str.toLowerCase()
@@ -53,7 +54,7 @@ export default function AdminBlogForm() {
             category_id: String(b.category_id || 1),
             status:      b.status || 'published',
           });
-          if (b.thumbnail) setThumbnailPreview(b.thumbnail);
+          if (b.thumbnail) setThumbnailPreview(mediaUrl(b.thumbnail));
         }
       })
       .catch(() => {});

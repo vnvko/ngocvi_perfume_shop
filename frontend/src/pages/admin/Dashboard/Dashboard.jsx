@@ -5,6 +5,7 @@ import { FiPackage, FiShoppingCart, FiDollarSign, FiUsers, FiDownload } from 're
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { AdminLayout } from '../../../components/admin/AdminLayout';
 import { adminAPI } from '../../../services/api';
+import { mediaUrl } from '../../../utils/mediaUrl';
 
 const fmtPrice = (n) => new Intl.NumberFormat('vi-VN').format(n || 0) + 'đ';
 
@@ -123,7 +124,7 @@ export default function Dashboard() {
             {topProducts.map(p => (
               <div key={p.id} className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-50 flex-shrink-0">
-                  {p.thumbnail ? <img src={p.thumbnail} alt={p.name} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-100" />}
+                  {p.thumbnail ? <img src={mediaUrl(p.thumbnail)} alt={p.name} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-100" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-gray-800 truncate">{p.name}</p>

@@ -2,8 +2,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FiUser, FiShoppingBag, FiMapPin, FiHeart, FiChevronRight, FiPackage, FiTruck, FiCheck } from 'react-icons/fi';
-import { useAuth } from '../../context/AuthContext';
-import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../hooks/useAuth';
+import { useCart } from '../../hooks/useCart';
 import { orderAPI } from '../../services/api';
 
 const fmtPrice = (n) => new Intl.NumberFormat('vi-VN').format(n || 0) + 'đ';

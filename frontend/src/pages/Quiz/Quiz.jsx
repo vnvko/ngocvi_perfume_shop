@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { productAPI } from '../../services/api';
+import { mediaUrl } from '../../utils/mediaUrl';
 
 const priceRanges = {
   budget:  { maxPrice: 1500000 },
@@ -67,7 +68,8 @@ export default function Quiz() {
         if (genderAns) params.gender = genderAns.tag;
         if (priceAns && priceRanges[priceAns.tag]) Object.assign(params, priceRanges[priceAns.tag]);
         const res = await productAPI.getAll(params);
-        setResults(res.data || []);
+        const raw = res.data;
+        setResults(Array.isArray(raw) ? raw : []);
       } catch { setResults([]); }
       finally { setLoading(false); }
     }
@@ -139,8 +141,8 @@ export default function Quiz() {
             <Link key={p.id} to={`/products/${p.slug}`} className="group">
               <div className="aspect-square bg-light-secondary overflow-hidden mb-3">
                 {p.thumbnail
-                  ? <img src={p.thumbnail} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  : <div className="w-full h-full flex items-center justify-center text-muted text-xs">No image</div>
+                  ? <img src={mediaUrl(p.thumbnail)} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  : <div className="w-full h-full flex items-center justify-center text-muted text-xs">Chưa có ảnh</div>
                 }
               </div>
               <p className="label-tag mb-0.5">{p.brand_name}</p>

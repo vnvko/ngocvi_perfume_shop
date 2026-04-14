@@ -47,6 +47,7 @@ import AdminChatbox       from '../pages/admin/Chatbox/AdminChatbox';
 import AdminStats         from '../pages/admin/Stats/AdminStats';
 import AdminVouchers      from '../pages/admin/Vouchers/AdminVouchers';
 import AdminBrands        from '../pages/admin/Brands/AdminBrands';
+import AdminBanners       from '../pages/admin/Banners/AdminBanners';
 
 const NotFound = () => (
   <div className="min-h-[60vh] flex items-center justify-center text-center px-4">
@@ -130,6 +131,7 @@ export default function AppRoutes() {
       <Route path="/admin/stats"                 element={<AdminRoute><AdminStats /></AdminRoute>} />
       <Route path="/admin/vouchers"              element={<AdminRoute><AdminVouchers /></AdminRoute>} />
       <Route path="/admin/brands"                element={<AdminRoute><AdminBrands /></AdminRoute>} />
+      <Route path="/admin/banners"               element={<AdminRoute><AdminBanners /></AdminRoute>} />
 
       <Route path="*" element={<MainLayout><NotFound /></MainLayout>} />
     </Routes>

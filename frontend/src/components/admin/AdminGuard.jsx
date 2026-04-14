@@ -1,9 +1,10 @@
 // Bảo vệ route admin — chỉ cho phép role admin/staff, redirect nếu chưa login
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function AdminGuard({ children }) {
-  const { user, loading } = useAuth();
+  const auth = useAuth();
+  const { user, loading } = auth || {};
   const location = useLocation();
 
   if (loading) return (

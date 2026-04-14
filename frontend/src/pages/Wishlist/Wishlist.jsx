@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { wishlistAPI } from '../../services/api';
 import ProductCard from '../../components/Product/ProductCard';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function Wishlist() {
   const [items, setItems] = useState([]);

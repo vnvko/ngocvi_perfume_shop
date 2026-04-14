@@ -150,8 +150,8 @@ const AdminReviewController = {
 const AdminBlogController = {
   async getAll(req, res) {
     try {
-      const { search, category, page = 1, limit = 10 } = req.query;
-      const { rows, total } = await Blog.getAll({ search, category, page, limit });
+      const { search, category, status, page = 1, limit = 10 } = req.query;
+      const { rows, total } = await Blog.getAll({ search, category, status, page, limit });
       return paginate(res, rows, total, page, limit);
     } catch (err) {
       return error(res, 'Lỗi lấy danh sách bài viết');
@@ -170,11 +170,14 @@ const AdminBlogController = {
 
   async create(req, res) {
     try {
-      const { title, content, category_id } = req.body;
+      const { title, content, category_id, status = 'published' } = req.body;
       if (!title || !content) return error(res, 'Thiếu tiêu đề hoặc nội dung', 400);
+      if (!['published', 'draft', 'hidden'].includes(status)) {
+        return error(res, 'Trạng thái bài viết không hợp lệ', 400);
+      }
       const slug = slugify(title, { lower: true, strict: true }) + '-' + Date.now();
       const thumbnail = req.file ? `/uploads/blogs/${req.file.filename}` : null;
-      const id = await Blog.create({ title, slug, content, author_id: req.user.id, category_id, thumbnail });
+      const id = await Blog.create({ title, slug, content, author_id: req.user.id, category_id, thumbnail, status });
       return success(res, { id }, 'Tạo bài viết thành công', 201);
     } catch (err) {
       return error(res, 'Lỗi tạo bài viết');
@@ -183,10 +186,13 @@ const AdminBlogController = {
 
   async update(req, res) {
     try {
-      const { title, content, category_id } = req.body;
+      const { title, content, category_id, status } = req.body;
+      if (status !== undefined && !['published', 'draft', 'hidden'].includes(status)) {
+        return error(res, 'Trạng thái bài viết không hợp lệ', 400);
+      }
       const slug = title ? slugify(title, { lower: true, strict: true }) + '-' + Date.now() : undefined;
       const thumbnail = req.file ? `/uploads/blogs/${req.file.filename}` : undefined;
-      await Blog.update(req.params.id, { title, slug, content, category_id, thumbnail });
+      await Blog.update(req.params.id, { title, slug, content, category_id, thumbnail, status });
       return success(res, null, 'Cập nhật bài viết thành công');
     } catch (err) {
       return error(res, 'Lỗi cập nhật bài viết');

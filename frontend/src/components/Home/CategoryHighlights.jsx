@@ -5,11 +5,11 @@ export default function CategoryHighlights() {
   const cats = [
     { label: "Nước Hoa Nam",    route: '/products?category=nuoc-hoa-nam', img: 'https://images.unsplash.com/photo-1587017539504-67cfbddac569?w=500&q=80' },
     { label: "Nước Hoa Nữ",  route: '/products?category=nuoc-hoa-nu',  img: 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=500&q=80' },
-    { label: "Unisex", route: '/products?category=unisex',        img: 'https://images.unsplash.com/photo-1563170351-be82bc888aa4?w=500&q=80' },
-    { label: "Gift Sets",      route: '/products?category=gift-sets',     img: 'https://images.unsplash.com/photo-1547887537-6158d64c35b3?w=500&q=80' },
+    { label: "Phi giới tính", route: '/products?category=unisex',        img: 'https://images.unsplash.com/photo-1563170351-be82bc888aa4?w=500&q=80' },
+    { label: "Bộ quà tặng",      route: '/products?category=gift-sets',     img: 'https://images.unsplash.com/photo-1547887537-6158d64c35b3?w=500&q=80' },
   ];
   return (
-    <section className="py-16 max-w-screen-xl mx-auto px-4 md:px-8">
+    <section className="section-space site-container">
       <h2 className="section-title text-center mb-10">{"Danh Mục"}</h2>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {cats.map(cat => (

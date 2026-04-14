@@ -1,9 +1,10 @@
 // Admin: Quản lý sản phẩm — danh sách, filter, toggle active, thêm/sửa/xóa
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FiPlus, FiEye, FiEdit2, FiTrash2, FiSearch } from 'react-icons/fi';
 import { AdminLayout } from '../../../components/admin/AdminLayout';
 import { adminAPI } from '../../../services/api';
+import { mediaUrl } from '../../../utils/mediaUrl';
 
 const fmtPrice = (n) => new Intl.NumberFormat('vi-VN').format(n || 0) + 'đ';
 
@@ -18,15 +19,15 @@ export default function AdminProducts() {
   const [page, setPage] = useState(1);
   const limit = 10;
 
-  const fetchProducts = () => {
+  const fetchProducts = useCallback(() => {
     setLoading(true);
     adminAPI.getProducts({ search, category: categoryFilter, brand: brandFilter, status: statusFilter, page, limit })
       .then(res => { setProducts(res.data || []); setTotal(res.pagination?.total || 0); })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
-  };
+  }, [search, categoryFilter, brandFilter, statusFilter, page, limit]);
 
-  useEffect(() => { fetchProducts(); }, [search, categoryFilter, brandFilter, statusFilter, page]);
+  useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
   const toggleActive = async (id, currentStatus) => {
     try {
@@ -36,7 +37,7 @@ export default function AdminProducts() {
   };
 
   const handleDelete = async (id, name) => {
-    if (!window.confirm(`Ẩn sản phẩm "${name}"?`)) return;
+    if (!window.confirm(`Xóa vĩnh viễn sản phẩm "${name}"? Thao tác này không hoàn tác.`)) return;
     try { await adminAPI.deleteProduct(id); fetchProducts(); } catch (err) { alert(err.message); }
   };
 
@@ -94,7 +95,7 @@ export default function AdminProducts() {
                 <td className="py-3 pr-4">
                   <div className="w-11 h-11 rounded-lg overflow-hidden bg-gray-50 flex-shrink-0">
                     {p.thumbnail
-                      ? <img src={p.thumbnail} alt={p.name} className="w-full h-full object-cover" />
+                      ? <img src={mediaUrl(p.thumbnail)} alt={p.name} className="w-full h-full object-cover" />
                       : <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-300 text-[10px]">no img</div>
                     }
                   </div>

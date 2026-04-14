@@ -10,7 +10,7 @@ export default function BrandCommitments() {
   
   return (
     <section className="border-t border-light-secondary">
-      <div className="max-w-screen-xl mx-auto px-4 md:px-8">
+      <div className="site-container">
         <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-light-secondary">
           {items.map(item => (
             <div key={item.title} className="py-8 px-6 text-center">

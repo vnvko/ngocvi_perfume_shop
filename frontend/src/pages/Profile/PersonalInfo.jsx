@@ -1,7 +1,7 @@
 // Cập nhật thông tin cá nhân — tên, SĐT; gọi authAPI.updateProfile()
 import { useState } from 'react';
 import { authAPI } from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function PersonalInfo() {
   const { user, updateUser } = useAuth();

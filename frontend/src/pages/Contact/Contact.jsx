@@ -18,7 +18,7 @@ const stores = [
 ];
 
 const channels = [
-  { icon: '💬', title: 'Zalo Support', desc: 'Chat ngay với tư vấn viên' },
+  { icon: '💬', title: 'Hỗ trợ Zalo', desc: 'Chat ngay với tư vấn viên' },
   { icon: '📱', title: 'Messenger', desc: 'Hỗ trợ trực tuyến 24/7' },
   { icon: '📞', title: 'Hotline', desc: '1900-xxxx (9:00 – 21:00)' },
 ];
@@ -40,12 +40,12 @@ export default function Contact() {
       <div className="relative h-52 md:h-64 overflow-hidden bg-dark">
         <img
           src="https://images.unsplash.com/photo-1587017539504-67cfbddac569?w=1400&q=80"
-          alt="Contact"
+          alt="Liên hệ"
           className="absolute inset-0 w-full h-full object-cover opacity-40"
         />
         <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-center">
           <h1 className="font-display text-3xl md:text-4xl tracking-wider mb-2">Liên Hệ & Hệ Thống Cửa Hàng</h1>
-          <p className="text-[11px] tracking-[0.3em] text-white/60 uppercase font-sans">Contact & Store Locator</p>
+          <p className="text-[11px] tracking-[0.3em] text-white/60 uppercase font-sans">Liên hệ & hệ thống cửa hàng</p>
           <div className="w-10 h-px bg-primary mx-auto mt-4" />
         </div>
       </div>
@@ -144,7 +144,7 @@ export default function Contact() {
                   />
                 </div>
                 <button type="submit" className="btn-primary w-full text-center">
-                  Gửi Tin Nhắn / Send Message
+                  Gửi tin nhắn
                 </button>
               </form>
             )}

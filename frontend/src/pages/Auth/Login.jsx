@@ -1,20 +1,29 @@
 // Trang đăng nhập / đăng ký — xác thực JWT với backend, redirect theo role
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function Login() {
   const { login, register, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const isRegister = location.pathname === '/register';
-  const [tab, setTab] = useState(isRegister ? 'register' : 'login');
+  const openRegister =
+    location.pathname === '/register' || Boolean(location.state?.register);
+  const [tab, setTab] = useState(openRegister ? 'register' : 'login');
   const [form, setForm] = useState({ name:'', email:'', phone:'', password:'', confirm:'' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const from = location.state?.from || '/';
 
-  useEffect(() => { if (user) navigate(user.role_name === 'admin' || user.role_name === 'staff' ? '/admin' : from, { replace: true }); }, [user]);
+  useEffect(() => {
+    if (location.state?.register) setTab('register');
+  }, [location.state?.register]);
+
+  useEffect(() => {
+    if (user) {
+      navigate(user.role_name === 'admin' || user.role_name === 'staff' ? '/admin' : from, { replace: true });
+    }
+  }, [user, from, navigate]);
 
   const up = (k, v) => setForm(p => ({ ...p, [k]: v }));
 

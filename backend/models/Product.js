@@ -18,12 +18,32 @@ const Product = {
       params.push(category, category);
     }
     if (brand) {
-      conditions.push('(b.slug = ? OR b.id = ?)');
-      params.push(brand, brand);
+      const brandList = String(brand)
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean);
+      if (brandList.length > 1) {
+        const placeholders = brandList.map(() => '?').join(',');
+        conditions.push(`(b.slug IN (${placeholders}) OR b.id IN (${placeholders}))`);
+        params.push(...brandList, ...brandList);
+      } else {
+        conditions.push('(b.slug = ? OR b.id = ?)');
+        params.push(brandList[0], brandList[0]);
+      }
     }
     if (gender) {
-      conditions.push('p.gender = ?');
-      params.push(gender);
+      const genderList = String(gender)
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean);
+      if (genderList.length > 1) {
+        const placeholders = genderList.map(() => '?').join(',');
+        conditions.push(`p.gender IN (${placeholders})`);
+        params.push(...genderList);
+      } else {
+        conditions.push('p.gender = ?');
+        params.push(genderList[0]);
+      }
     }
     if (minPrice) { conditions.push('p.price >= ?'); params.push(minPrice); }
     if (maxPrice) { conditions.push('p.price <= ?'); params.push(maxPrice); }
@@ -38,22 +58,30 @@ const Product = {
     };
     const orderBy = orderMap[sort] || 'p.created_at DESC';
 
+    // Không dùng GROUP BY + JOIN reviews/variants (tránh lỗi ONLY_FULL_GROUP_BY trên MySQL/MariaDB strict)
     const [rows] = await db.query(
       `SELECT p.id, p.name, p.slug, p.gender, p.price, p.sale_price, p.concentration, p.status,
               b.name as brand_name, b.slug as brand_slug,
               c.name as category_name, c.slug as category_slug,
               img.image_url as thumbnail,
-              COALESCE(AVG(r.rating), 0) as avg_rating,
-              COUNT(DISTINCT r.id) as review_count,
-              MIN(pv.stock) as min_stock
+              COALESCE((
+                SELECT AVG(r2.rating) FROM reviews r2
+                WHERE r2.product_id = p.id AND r2.status = 'visible'
+              ), 0) AS avg_rating,
+              (SELECT COUNT(*) FROM reviews r3
+               WHERE r3.product_id = p.id AND r3.status = 'visible') AS review_count,
+              (SELECT MIN(pv2.stock) FROM product_variants pv2 WHERE pv2.product_id = p.id) AS min_stock
        FROM products p
        LEFT JOIN brands b ON p.brand_id = b.id
        LEFT JOIN categories c ON p.category_id = c.id
-       LEFT JOIN product_images img ON img.product_id = p.id AND img.is_main = 1
-       LEFT JOIN reviews r ON r.product_id = p.id AND r.status = 'visible'
-       LEFT JOIN product_variants pv ON pv.product_id = p.id
+       LEFT JOIN product_images img ON img.id = (
+         SELECT pi.id
+         FROM product_images pi
+         WHERE pi.product_id = p.id
+         ORDER BY pi.is_main DESC, pi.id ASC
+         LIMIT 1
+       )
        WHERE ${where}
-       GROUP BY p.id
        ORDER BY ${orderBy}
        LIMIT ? OFFSET ?`,
       [...params, parseInt(limit), offset]
@@ -76,14 +104,17 @@ const Product = {
     const [rows] = await db.query(
       `SELECT p.*, b.name as brand_name, b.slug as brand_slug,
               c.name as category_name, c.slug as category_slug,
-              COALESCE(AVG(r.rating), 0) as avg_rating,
-              COUNT(DISTINCT r.id) as review_count
+              COALESCE((
+                SELECT AVG(r2.rating) FROM reviews r2
+                WHERE r2.product_id = p.id AND r2.status = 'visible'
+              ), 0) AS avg_rating,
+              (SELECT COUNT(*) FROM reviews r3
+               WHERE r3.product_id = p.id AND r3.status = 'visible') AS review_count
        FROM products p
        LEFT JOIN brands b ON p.brand_id = b.id
        LEFT JOIN categories c ON p.category_id = c.id
-       LEFT JOIN reviews r ON r.product_id = p.id AND r.status = 'visible'
        WHERE p.slug = ? AND p.status = 'active'
-       GROUP BY p.id LIMIT 1`,
+       LIMIT 1`,
       [slug]
     );
     if (!rows.length) return null;
@@ -134,7 +165,13 @@ const Product = {
               COALESCE(AVG(r.rating), 0) as avg_rating
        FROM products p
        LEFT JOIN brands b ON p.brand_id = b.id
-       LEFT JOIN product_images img ON img.product_id = p.id AND img.is_main = 1
+       LEFT JOIN product_images img ON img.id = (
+         SELECT pi.id
+         FROM product_images pi
+         WHERE pi.product_id = p.id
+         ORDER BY pi.is_main DESC, pi.id ASC
+         LIMIT 1
+       )
        LEFT JOIN reviews r ON r.product_id = p.id AND r.status = 'visible'
        WHERE p.id != ? AND p.status = 'active'
          AND (p.category_id = ? OR p.brand_id = ?)
@@ -206,7 +243,13 @@ const Product = {
        FROM products p
        LEFT JOIN brands b ON p.brand_id = b.id
        LEFT JOIN categories c ON p.category_id = c.id
-       LEFT JOIN product_images img ON img.product_id = p.id AND img.is_main = 1
+       LEFT JOIN product_images img ON img.id = (
+         SELECT pi.id
+         FROM product_images pi
+         WHERE pi.product_id = p.id
+         ORDER BY pi.is_main DESC, pi.id ASC
+         LIMIT 1
+       )
        LEFT JOIN product_variants pv ON pv.product_id = p.id
        WHERE ${where}
        GROUP BY p.id

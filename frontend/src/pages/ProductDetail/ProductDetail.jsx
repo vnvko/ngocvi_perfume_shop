@@ -3,9 +3,10 @@ import { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { FiStar, FiShoppingBag, FiHeart, FiCheck, FiChevronRight, FiPlus, FiMinus } from 'react-icons/fi';
 import { productAPI, reviewAPI } from '../../services/api';
-import { useCart } from '../../context/CartContext';
-import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../hooks/useCart';
+import { useAuth } from '../../hooks/useAuth';
 import ProductCard from '../../components/Product/ProductCard';
+import { mediaUrl } from '../../utils/mediaUrl';
 
 const fmtPrice = (n) => new Intl.NumberFormat('vi-VN').format(n || 0) + 'đ';
 
@@ -24,14 +25,8 @@ export default function ProductDetail() {
   const [mainImg, setMainImg] = useState(null);
   const [added, setAdded] = useState(false);
   const [activeTab, setActiveTab] = useState('desc');
-
-  // Review form
-  const [showReviewForm, setShowReviewForm] = useState(false);
-  const [reviewRating, setReviewRating] = useState(5);
-  const [reviewComment, setReviewComment] = useState('');
-  const [reviewSending, setReviewSending] = useState(false);
-  const [reviewDone, setReviewDone] = useState(false);
-  const [hoverRating, setHoverRating] = useState(0);
+  /** canReview | alreadyReviewed | hasPurchased — từ API eligibility */
+  const [reviewEligibility, setReviewEligibility] = useState(null);
 
   const isWishlisted = product ? wishlist.includes(product.id) : false;
 
@@ -48,7 +43,8 @@ export default function ProductDetail() {
         return reviewAPI.getByProduct(p.id, { limit: 20 });
       })
       .then(res => {
-        setReviews(res.data.reviews || []);
+        const payload = res.data || {};
+        setReviews(payload.rows || payload.reviews || []);
         setLoading(false);
         // Load related
         return productAPI.getAll({ category: '', limit: 4, sort: 'rating' });
@@ -57,28 +53,26 @@ export default function ProductDetail() {
       .catch(() => setLoading(false));
   }, [slug]);
 
+  useEffect(() => {
+    if (!user || !product?.id) {
+      setReviewEligibility(null);
+      return;
+    }
+    let cancelled = false;
+    reviewAPI.getEligibility(product.id)
+      .then((res) => {
+        if (!cancelled) setReviewEligibility(res.data || null);
+      })
+      .catch(() => { if (!cancelled) setReviewEligibility(null); });
+    return () => { cancelled = true; };
+  }, [user, product?.id]);
+
   const handleAddToCart = async () => {
     if (!user) { navigate('/login'); return; }
     if (!selectedVariant) return;
     await addToCart(product, `${selectedVariant.volume_ml}ml`, qty);
     setAdded(true);
     setTimeout(() => setAdded(false), 2500);
-  };
-
-  const handleSubmitReview = async () => {
-    if (!user) { navigate('/login'); return; }
-    if (!reviewComment.trim()) return;
-    setReviewSending(true);
-    try {
-      await reviewAPI.create({ product_id: product.id, rating: reviewRating, comment: reviewComment });
-      const res = await reviewAPI.getByProduct(product.id, { limit: 20 });
-      setReviews(res.data.reviews || []);
-      setReviewDone(true);
-      setShowReviewForm(false);
-      setReviewComment('');
-      setReviewRating(5);
-    } catch {}
-    finally { setReviewSending(false); }
   };
 
   const avgRating = reviews.length ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1) : null;
@@ -121,7 +115,7 @@ export default function ProductDetail() {
         <div>
           <div className="aspect-square bg-light-secondary overflow-hidden mb-4">
             {mainImg
-              ? <img src={mainImg} alt={product.name} className="w-full h-full object-cover" />
+              ? <img src={mediaUrl(mainImg)} alt={product.name} className="w-full h-full object-cover" />
               : <div className="w-full h-full flex items-center justify-center text-muted text-sm font-sans">Chưa có ảnh</div>
             }
           </div>
@@ -130,7 +124,7 @@ export default function ProductDetail() {
               {product.images.map(img => (
                 <button key={img.id} onClick={() => setMainImg(img.image_url)}
                   className={`w-16 h-16 flex-shrink-0 overflow-hidden border-2 transition-colors ${mainImg === img.image_url ? 'border-primary' : 'border-transparent'}`}>
-                  <img src={img.image_url} alt="" className="w-full h-full object-cover" />
+                  <img src={mediaUrl(img.image_url)} alt="" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
@@ -297,43 +291,21 @@ export default function ProductDetail() {
             </div>
           )}
 
-          {/* Write review button */}
-          {user && !reviewDone && (
-            <div className="mb-6">
-              {!showReviewForm ? (
-                <button onClick={() => setShowReviewForm(true)}
-                  className="btn-outline text-sm">
-                  Viết Đánh Giá
-                </button>
-              ) : (
-                <div className="border border-light-secondary p-5 mb-6">
-                  <h4 className="font-serif text-base text-dark mb-4">Đánh giá của bạn</h4>
-                  <div className="flex gap-1 mb-4">
-                    {Array.from({length:5}, (_,i) => (
-                      <button key={i}
-                        onMouseEnter={() => setHoverRating(i+1)}
-                        onMouseLeave={() => setHoverRating(0)}
-                        onClick={() => setReviewRating(i+1)}>
-                        <FiStar size={24} className={i < (hoverRating || reviewRating) ? 'fill-primary text-primary' : 'text-muted'} />
-                      </button>
-                    ))}
-                    <span className="text-xs text-muted font-sans ml-2 self-center">{reviewRating}/5 sao</span>
-                  </div>
-                  <textarea value={reviewComment} onChange={e => setReviewComment(e.target.value)}
-                    rows={4} placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm này..."
-                    className="w-full border border-light-secondary px-3 py-2.5 text-sm font-sans outline-none focus:border-primary transition-colors resize-none mb-3" />
-                  <div className="flex gap-3">
-                    <button onClick={handleSubmitReview} disabled={reviewSending || !reviewComment.trim()}
-                      className="btn-primary text-xs disabled:opacity-50">
-                      {reviewSending ? 'Đang gửi...' : "Gửi Đánh Giá"}
-                    </button>
-                    <button onClick={() => setShowReviewForm(false)} className="text-xs text-muted hover:text-dark font-sans">Hủy</button>
-                  </div>
-                </div>
+          {user && (
+            <div className="mb-6 font-sans text-sm">
+              {reviewEligibility?.alreadyReviewed && (
+                <p className="text-muted">Bạn đã đánh giá sản phẩm này.</p>
+              )}
+              {reviewEligibility && !reviewEligibility.alreadyReviewed && reviewEligibility.canReview && (
+                <Link to={`/products/${slug}/review`} className="btn-outline text-sm inline-block text-center">
+                  Viết đánh giá
+                </Link>
+              )}
+              {reviewEligibility && !reviewEligibility.alreadyReviewed && !reviewEligibility.canReview && !reviewEligibility.hasPurchased && (
+                <p className="text-muted">Chỉ khách đã mua và hoàn tất đơn hàng mới có thể đánh giá sản phẩm này.</p>
               )}
             </div>
           )}
-          {reviewDone && <p className="text-green-600 text-sm font-sans mb-4">✓ Cảm ơn bạn đã đánh giá sản phẩm!</p>}
 
           {/* Reviews list */}
           {reviews.length === 0 ? (
@@ -357,6 +329,20 @@ export default function ProductDetail() {
                     <span className="text-xs text-muted font-sans">{new Date(r.created_at).toLocaleDateString('vi-VN')}</span>
                   </div>
                   <p className="text-sm font-sans text-dark/80 leading-relaxed">{r.comment}</p>
+                  {r.media?.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {r.media.map((m) =>
+                        m.media_type === 'video' ? (
+                          <video key={m.id} src={mediaUrl(m.file_url)} controls className="max-h-48 max-w-full rounded border border-light-secondary bg-black/5"
+                            playsInline />
+                        ) : (
+                          <a key={m.id} href={mediaUrl(m.file_url)} target="_blank" rel="noreferrer" className="block">
+                            <img src={mediaUrl(m.file_url)} alt="" className="h-24 w-auto max-w-[200px] object-cover rounded border border-light-secondary hover:opacity-90" />
+                          </a>
+                        )
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

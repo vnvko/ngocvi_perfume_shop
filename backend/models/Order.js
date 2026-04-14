@@ -21,7 +21,7 @@ const Order = {
         item._price = variants[0].price;
       }
 
-      const total_price = subtotal + shipping_fee - discount;
+      const total_price = Math.max(0, subtotal + shipping_fee - discount);
       const order_code = 'NGV-' + Date.now();
 
       // Tạo order
@@ -89,9 +89,18 @@ const Order = {
     const [rows] = await db.query(
       `SELECT o.id, o.order_code, o.total_price, o.shipping_fee, o.discount,
               o.payment_method, o.status, o.created_at,
-              COUNT(oi.id) as item_count
+              COUNT(oi.id) as item_count,
+              COALESCE(
+                (SELECT MAX(h.updated_at) FROM order_status_history h WHERE h.order_id = o.id),
+                o.created_at
+              ) AS status_updated_at,
+              GROUP_CONCAT(
+                DISTINCT CONCAT(oi.product_id, ':', COALESCE(p.slug, ''))
+                ORDER BY oi.id SEPARATOR '||'
+              ) AS review_products
        FROM orders o
        LEFT JOIN order_items oi ON oi.order_id = o.id
+       LEFT JOIN products p ON p.id = oi.product_id
        WHERE ${conditions.join(' AND ')}
        GROUP BY o.id
        ORDER BY o.created_at DESC
@@ -129,7 +138,13 @@ const Order = {
        FROM order_items oi
        LEFT JOIN products p ON oi.product_id = p.id
        LEFT JOIN product_variants pv ON oi.variant_id = pv.id
-       LEFT JOIN product_images img ON img.product_id = p.id AND img.is_main = 1
+       LEFT JOIN product_images img ON img.id = (
+         SELECT pi.id
+         FROM product_images pi
+         WHERE pi.product_id = p.id
+         ORDER BY pi.is_main DESC, pi.id ASC
+         LIMIT 1
+       )
        WHERE oi.order_id = ?`,
       [orderId]
     );

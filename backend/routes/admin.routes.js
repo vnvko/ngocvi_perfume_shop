@@ -1,9 +1,11 @@
-// Routes admin (yêu cầu auth + staff/admin role) — dashboard, products, orders, users, reviews, blog, chatbox, banners
+// Routes admin (yêu cầu auth + staff/admin role) — dashboard, products, orders, users, reviews, blog, chatbox, banners, vouchers
 const express = require('express');
 const router = express.Router();
+const db = require('../config/db');
 const { authenticate } = require('../middleware/auth');
 const { requireStaff, requireAdmin } = require('../middleware/role');
 const upload = require('../middleware/upload');
+const { success, error } = require('../utils/response');
 
 const DashboardController = require('../controllers/admin/dashboard.controller');
 const AdminProductController = require('../controllers/admin/product.admin.controller');
@@ -16,7 +18,6 @@ const {
   AdminBannerController,
 } = require('../controllers/admin/admin.controller');
 
-// Tất cả admin routes đều cần đăng nhập + staff/admin role
 router.use(authenticate, requireStaff);
 
 // ── Dashboard ──
@@ -88,31 +89,56 @@ router.post('/banners', upload.single('image'), AdminBannerController.create);
 router.put('/banners/:id', upload.single('image'), AdminBannerController.update);
 router.delete('/banners/:id', requireAdmin, AdminBannerController.delete);
 
-module.exports = router;
-
-// ── Vouchers admin ──
+// ── Vouchers (một bộ route duy nhất, có used_count) ──
 router.get('/vouchers', async (req, res) => {
-  const db = require('../config/db');
-  const { success, error } = require('../utils/response');
   try {
     const { search } = req.query;
-    let sql = 'SELECT * FROM vouchers';
+    let sql = `
+      SELECT v.*,
+        (SELECT COUNT(*) FROM voucher_usage vu WHERE vu.voucher_id = v.id) AS used_count
+      FROM vouchers v`;
     const params = [];
-    if (search) { sql += ' WHERE code LIKE ?'; params.push(`%${search}%`); }
-    sql += ' ORDER BY id DESC';
+    if (search) {
+      sql += ' WHERE v.code LIKE ?';
+      params.push(`%${search}%`);
+    }
+    sql += ' ORDER BY v.id DESC';
     const [rows] = await db.query(sql, params);
     return success(res, { vouchers: rows });
-  } catch { return error(res, 'Lỗi lấy vouchers'); }
+  } catch {
+    return error(res, 'Lỗi lấy danh sách voucher');
+  }
 });
 
 router.post('/vouchers', requireAdmin, async (req, res) => {
-  const db = require('../config/db');
-  const { success, error } = require('../utils/response');
   try {
-    const { code, discount_type, discount_value, max_discount, min_order_value, quantity, start_date, end_date } = req.body;
+    const {
+      code,
+      discount_type = 'percent',
+      discount_value,
+      max_discount,
+      min_order_value,
+      quantity,
+      start_date,
+      end_date,
+    } = req.body;
+    if (!code || discount_value === undefined || discount_value === '') {
+      return error(res, 'Thiếu mã hoặc giá trị giảm giá', 400);
+    }
+    const codeNorm = String(code).trim().toUpperCase();
     const [r] = await db.query(
-      'INSERT INTO vouchers (code,discount_type,discount_value,max_discount,min_order_value,quantity,start_date,end_date) VALUES (?,?,?,?,?,?,?,?)',
-      [code.toUpperCase(), discount_type, discount_value, max_discount||null, min_order_value||0, quantity||100, start_date||null, end_date||null]
+      `INSERT INTO vouchers (code, discount_type, discount_value, max_discount, min_order_value, quantity, start_date, end_date)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [
+        codeNorm,
+        discount_type,
+        discount_value,
+        max_discount || null,
+        min_order_value ?? 0,
+        quantity ?? 100,
+        start_date || null,
+        end_date || null,
+      ]
     );
     return success(res, { id: r.insertId }, 'Tạo voucher thành công', 201);
   } catch (err) {
@@ -122,104 +148,50 @@ router.post('/vouchers', requireAdmin, async (req, res) => {
 });
 
 router.put('/vouchers/:id', requireAdmin, async (req, res) => {
-  const db = require('../config/db');
-  const { success, error } = require('../utils/response');
   try {
-    const { code, discount_type, discount_value, max_discount, min_order_value, quantity, start_date, end_date } = req.body;
+    const {
+      code,
+      discount_type,
+      discount_value,
+      max_discount,
+      min_order_value,
+      quantity,
+      start_date,
+      end_date,
+    } = req.body;
+    if (!code || discount_value === undefined || discount_value === '') {
+      return error(res, 'Thiếu mã hoặc giá trị giảm giá', 400);
+    }
+    const codeNorm = String(code).trim().toUpperCase();
     await db.query(
-      'UPDATE vouchers SET code=?,discount_type=?,discount_value=?,max_discount=?,min_order_value=?,quantity=?,start_date=?,end_date=? WHERE id=?',
-      [code.toUpperCase(), discount_type, discount_value, max_discount||null, min_order_value||0, quantity||100, start_date||null, end_date||null, req.params.id]
+      `UPDATE vouchers SET code=?, discount_type=?, discount_value=?, max_discount=?, min_order_value=?, quantity=?, start_date=?, end_date=?
+       WHERE id=?`,
+      [
+        codeNorm,
+        discount_type,
+        discount_value,
+        max_discount || null,
+        min_order_value ?? 0,
+        quantity ?? 100,
+        start_date || null,
+        end_date || null,
+        req.params.id,
+      ]
     );
-    return success(res, null, 'Cập nhật thành công');
-  } catch { return error(res, 'Lỗi cập nhật voucher'); }
-});
-
-router.delete('/vouchers/:id', requireAdmin, async (req, res) => {
-  const db = require('../config/db');
-  const { success, error } = require('../utils/response');
-  try {
-    await db.query('DELETE FROM vouchers WHERE id=?', [req.params.id]);
-    return success(res, null, 'Đã xóa voucher');
-  } catch { return error(res, 'Lỗi xóa voucher'); }
-});
-
-// ── Vouchers (Admin) ──
-const db2 = require('../config/db');
-const { success: succ2, error: err2, paginate: pag2 } = require('../utils/response');
-
-router.get('/vouchers', async (req, res) => {
-  try {
-    const [rows] = await db2.query('SELECT * FROM vouchers ORDER BY id DESC');
-    return succ2(res, { vouchers: rows });
-  } catch { return err2(res, 'Lỗi lấy vouchers'); }
-});
-
-router.post('/vouchers', requireAdmin, async (req, res) => {
-  try {
-    const { code, discount_type, discount_value, max_discount, min_order_value, quantity, start_date, end_date } = req.body;
-    if (!code || !discount_value) return err2(res, 'Thiếu thông tin bắt buộc', 400);
-    const [r] = await db2.query(
-      'INSERT INTO vouchers (code,discount_type,discount_value,max_discount,min_order_value,quantity,start_date,end_date) VALUES (?,?,?,?,?,?,?,?)',
-      [code.toUpperCase(), discount_type||'percent', discount_value, max_discount||null, min_order_value||0, quantity||100, start_date||new Date(), end_date||null]
-    );
-    return succ2(res, { id: r.insertId, code }, 'Tạo voucher thành công', 201);
-  } catch (e) {
-    if (e.code === 'ER_DUP_ENTRY') return err2(res, 'Mã voucher đã tồn tại', 400);
-    return err2(res, 'Lỗi tạo voucher');
+    return success(res, null, 'Cập nhật voucher thành công');
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return error(res, 'Mã voucher đã tồn tại', 409);
+    return error(res, 'Lỗi cập nhật voucher');
   }
 });
 
 router.delete('/vouchers/:id', requireAdmin, async (req, res) => {
   try {
-    await db2.query('DELETE FROM vouchers WHERE id=?', [req.params.id]);
-    return succ2(res, null, 'Đã xóa voucher');
-  } catch { return err2(res, 'Lỗi xóa voucher'); }
-});
-
-// ── Vouchers ──
-router.get('/vouchers', async (req, res) => {
-  const db = require('../config/db');
-  const { success, error } = require('../utils/response');
-  try {
-    const [rows] = await db.query(`
-      SELECT v.*, 
-        (SELECT COUNT(*) FROM voucher_usage vu WHERE vu.voucher_id = v.id) AS used_count
-      FROM vouchers v ORDER BY v.id DESC`);
-    return success(res, { vouchers: rows });
-  } catch { return error(res, 'Lỗi lấy danh sách voucher'); }
-});
-
-router.post('/vouchers', requireAdmin, async (req, res) => {
-  const db = require('../config/db');
-  const { success, error } = require('../utils/response');
-  try {
-    const { code, discount_type, discount_value, max_discount, min_order_value, quantity, start_date, end_date } = req.body;
-    const [r] = await db.query(
-      'INSERT INTO vouchers (code, discount_type, discount_value, max_discount, min_order_value, quantity, start_date, end_date) VALUES (?,?,?,?,?,?,?,?)',
-      [code, discount_type, discount_value, max_discount || null, min_order_value || 0, quantity || 999, start_date || null, end_date || null]
-    );
-    return success(res, { id: r.insertId }, 'Tạo voucher thành công', 201);
-  } catch (e) { return error(res, e.code === 'ER_DUP_ENTRY' ? 'Mã code đã tồn tại' : 'Lỗi tạo voucher'); }
-});
-
-router.put('/vouchers/:id', requireAdmin, async (req, res) => {
-  const db = require('../config/db');
-  const { success, error } = require('../utils/response');
-  try {
-    const { code, discount_type, discount_value, max_discount, min_order_value, quantity, start_date, end_date } = req.body;
-    await db.query(
-      'UPDATE vouchers SET code=?, discount_type=?, discount_value=?, max_discount=?, min_order_value=?, quantity=?, start_date=?, end_date=? WHERE id=?',
-      [code, discount_type, discount_value, max_discount || null, min_order_value || 0, quantity || 999, start_date || null, end_date || null, req.params.id]
-    );
-    return success(res, null, 'Cập nhật voucher thành công');
-  } catch { return error(res, 'Lỗi cập nhật voucher'); }
-});
-
-router.delete('/vouchers/:id', requireAdmin, async (req, res) => {
-  const db = require('../config/db');
-  const { success, error } = require('../utils/response');
-  try {
     await db.query('DELETE FROM vouchers WHERE id=?', [req.params.id]);
-    return success(res, null, 'Xóa voucher thành công');
-  } catch { return error(res, 'Lỗi xóa voucher'); }
+    return success(res, null, 'Đã xóa voucher');
+  } catch {
+    return error(res, 'Lỗi xóa voucher');
+  }
 });
+
+module.exports = router;

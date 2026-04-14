@@ -1,7 +1,7 @@
 // Chatbox nổi góc phải màn hình — button mở chat, bot tự trả lời, kết nối admin
 import { useState, useRef, useEffect } from 'react';
 import { FiSend, FiMessageCircle, FiX } from 'react-icons/fi';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 
 
@@ -16,8 +16,14 @@ const botAutoReply = (text) => {
   return "botDefault";
 };
 
+const QUICK_REPLIES = [
+  'Giá sản phẩm thế nào?',
+  'Phí giao hàng ra sao?',
+  'Có phải hàng chính hãng không?',
+  'Chính sách đổi trả?',
+];
+
 export default function Chatbox() {
-  const quickReplies = "quickReplies";
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -134,7 +140,7 @@ export default function Chatbox() {
           {/* Quick replies */}
           {messages.length <= 2 && (
             <div className="px-3 py-2 bg-light flex gap-2 flex-wrap border-t border-light-secondary">
-              {quickReplies.map(q => (
+              {QUICK_REPLIES.map((q) => (
                 <button key={q} onClick={() => sendMessage(q)}
                   className="text-xs font-sans border border-primary text-primary px-2.5 py-1 hover:bg-primary hover:text-white transition-colors">
                   {q}

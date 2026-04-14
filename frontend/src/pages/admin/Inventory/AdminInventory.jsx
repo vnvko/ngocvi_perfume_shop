@@ -1,8 +1,9 @@
 // Admin: Quản lý kho — tồn kho theo variant, chỉnh sửa stock trực tiếp
-import { useState, useEffect } from 'react';
-import { FiUpload, FiEdit2, FiSearch } from 'react-icons/fi';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { FiUpload, FiEdit2, FiSearch, FiDownload } from 'react-icons/fi';
 import { AdminLayout } from '../../../components/admin/AdminLayout';
 import { adminAPI } from '../../../services/api';
+import { mediaUrl } from '../../../utils/mediaUrl';
 
 const fmtPrice = (n) => new Intl.NumberFormat('vi-VN').format(n || 0) + 'đ';
 
@@ -13,10 +14,17 @@ export default function AdminInventory() {
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editStock, setEditStock] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importVariantId, setImportVariantId] = useState('');
+  const [importQty, setImportQty] = useState('');
+  const [importSearch, setImportSearch] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const csvInputRef = useRef(null);
 
-  const fetchInventory = () => {
+  const fetchInventory = useCallback(() => {
     setLoading(true);
-    adminAPI.getInventory({ search })
+    adminAPI.getInventory({ search, page: 1, limit: 10000 })
       .then(res => {
         const items = res.data.inventory || [];
         setInventory(items);
@@ -27,9 +35,146 @@ export default function AdminInventory() {
       })
       .catch(() => setInventory([]))
       .finally(() => setLoading(false));
+  }, [search]);
+
+  const exportInventoryCsv = () => {
+    if (!inventory.length) return;
+    const exportedAt = new Date().toLocaleString('vi-VN');
+    const headers = [
+      'Ma bien the',
+      'Ten san pham',
+      'Dung tich (ml)',
+      'Ton hien tai',
+      'Dang giao',
+      'Ton kha dung',
+      'Nhap kho',
+      'So luong nhap kho gan nhat',
+      'Gia (VND)',
+      'Thoi gian nhap kho gan nhat',
+    ];
+    const escape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows = inventory.map((item) => {
+      const available = (item.stock || 0) - (item.shipping_qty || 0);
+      return [
+        item.variant_id,
+        item.name,
+        item.volume_ml,
+        item.stock,
+        item.shipping_qty || 0,
+        available,
+        '',
+        item.latest_import_qty || 0,
+        item.price || 0,
+        item.latest_import_at || '',
+      ].map(escape).join(',');
+    });
+    const csv = [`Thoi gian xuat file,${escape(exportedAt)}`, headers.join(','), ...rows].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ton-kho-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
-  useEffect(() => { fetchInventory(); }, [search]);
+  const parseCsvLine = (line) => {
+    const values = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === ',' && !inQuotes) {
+        values.push(current);
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    values.push(current);
+    return values.map((v) => v.trim());
+  };
+
+  const handleImportCsvFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      setBulkImporting(true);
+      const text = await file.text();
+      const lines = text
+        .replace(/^\uFEFF/, '')
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean);
+
+      if (lines.length < 2) {
+        alert('File CSV không có dữ liệu.');
+        return;
+      }
+
+      const headerLineIndex = lines.findIndex((line) => {
+        const cols = parseCsvLine(line).map((h) => h.toLowerCase());
+        return cols.includes('ma bien the') && cols.includes('nhap kho');
+      });
+      if (headerLineIndex === -1) {
+        alert('File CSV không đúng định dạng. Cần có dòng tiêu đề chứa "Ma bien the" và "Nhap kho".');
+        return;
+      }
+      const headers = parseCsvLine(lines[headerLineIndex]).map((h) => h.toLowerCase());
+      const variantIdx = headers.findIndex((h) => h === 'ma bien the');
+      const qtyIdx = headers.findIndex((h) => h === 'nhap kho');
+
+      if (variantIdx === -1 || qtyIdx === -1) {
+        alert('File CSV không đúng định dạng. Cần có cột "Ma bien the" và "Nhap kho".');
+        return;
+      }
+
+      const payload = lines
+        .slice(headerLineIndex + 1)
+        .map((line) => parseCsvLine(line))
+        .map((cols) => ({
+          variantId: parseInt(String(cols[variantIdx] || '').replace(/[^\d-]/g, ''), 10),
+          qty: parseInt(String(cols[qtyIdx] || '').replace(/[^\d-]/g, ''), 10),
+        }))
+        .filter((r) => Number.isInteger(r.variantId) && Number.isInteger(r.qty) && r.variantId > 0 && r.qty > 0);
+
+      if (!payload.length) {
+        alert('Không tìm thấy dòng hợp lệ để nhập kho (số lượng phải > 0).');
+        return;
+      }
+
+      let successCount = 0;
+      let failCount = 0;
+      for (const row of payload) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await adminAPI.updateStock(row.variantId, { change_type: 'import', quantity: row.qty });
+          successCount++;
+        } catch (_) {
+          failCount++;
+        }
+      }
+
+      fetchInventory();
+      alert(`Import CSV hoàn tất. Thành công: ${successCount}, thất bại: ${failCount}.`);
+    } catch (err) {
+      alert('Không thể đọc file CSV.');
+    } finally {
+      setBulkImporting(false);
+      if (csvInputRef.current) csvInputRef.current.value = '';
+    }
+  };
+
+  useEffect(() => { fetchInventory(); }, [fetchInventory]);
 
   const handleUpdateStock = async (variantId) => {
     const newStock = parseInt(editStock);
@@ -42,6 +187,39 @@ export default function AdminInventory() {
     } catch {}
   };
 
+  const handleImportStock = async () => {
+    const variantId = parseInt(importVariantId, 10);
+    const qty = parseInt(importQty, 10);
+    if (!variantId || isNaN(qty) || qty <= 0) return;
+    try {
+      setImporting(true);
+      await adminAPI.updateStock(variantId, { change_type: 'import', quantity: qty });
+      setShowImportModal(false);
+      setImportVariantId('');
+      setImportQty('');
+      fetchInventory();
+    } catch (err) {
+      alert(err.message || 'Nhập kho thất bại');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const normalizedSearch = importSearch.trim().toLowerCase();
+  const importCandidates = [...inventory]
+    .sort((a, b) => {
+      const byName = String(a.name || '').localeCompare(String(b.name || ''), 'vi');
+      if (byName !== 0) return byName;
+      return (a.volume_ml || 0) - (b.volume_ml || 0);
+    })
+    .filter((item) => {
+      if (!normalizedSearch) return true;
+      const hay = `${item.variant_id} ${item.name} ${item.volume_ml}ml`.toLowerCase();
+      return hay.includes(normalizedSearch);
+    });
+
+  const selectedImportItem = inventory.find((i) => String(i.variant_id) === String(importVariantId));
+
   const statusInfo = (item) => {
     if (item.stock === 0) return { label: 'Hết hàng', cls: 'badge-red' };
     if (item.stock <= 5) return { label: 'Sắp hết hàng', cls: 'badge-yellow' };
@@ -52,7 +230,26 @@ export default function AdminInventory() {
     <AdminLayout breadcrumb={{ current: 'Quản lý kho' }}>
       <div className="flex items-start justify-between mb-6">
         <h1 className="text-xl font-semibold text-gray-800">Quản lý kho hàng</h1>
-        <button className="btn-primary flex items-center gap-1.5"><FiUpload size={13} /> Nhập kho</button>
+        <div className="flex items-center gap-2">
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={handleImportCsvFile}
+          />
+          <button
+            onClick={() => csvInputRef.current?.click()}
+            className="btn-outline flex items-center gap-1.5"
+            disabled={bulkImporting}
+          >
+            <FiUpload size={13} /> {bulkImporting ? 'Đang import...' : 'Import CSV'}
+          </button>
+          <button onClick={exportInventoryCsv} className="btn-outline flex items-center gap-1.5">
+            <FiDownload size={13} /> Xuất CSV
+          </button>
+          <button onClick={() => setShowImportModal(true)} className="btn-primary flex items-center gap-1.5"><FiUpload size={13} /> Nhập kho</button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -100,7 +297,7 @@ export default function AdminInventory() {
                   <td className="py-3 pr-3 text-[11px] text-gray-500">#{item.variant_id}</td>
                   <td className="py-3 pr-3">
                     <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-50">
-                      {item.thumbnail ? <img src={item.thumbnail} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-100" />}
+                      {item.thumbnail ? <img src={mediaUrl(item.thumbnail)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-100" />}
                     </div>
                   </td>
                   <td className="py-3 pr-3 text-xs font-medium text-gray-800 max-w-[140px] truncate">{item.name}</td>
@@ -133,6 +330,82 @@ export default function AdminInventory() {
           </tbody>
         </table>
       </div>
+
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => !importing && setShowImportModal(false)} />
+          <div className="relative bg-white w-full max-w-xl rounded-lg shadow-xl p-5">
+            <h3 className="text-base font-semibold text-gray-800 mb-1">Nhập kho</h3>
+            <p className="text-xs text-gray-500 mb-4">Tìm biến thể cần nhập và nhập số lượng bổ sung.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1.5">Tìm nhanh biến thể</label>
+                <input
+                  value={importSearch}
+                  onChange={(e) => setImportSearch(e.target.value)}
+                  className="input mb-2"
+                  placeholder="Nhập tên sản phẩm, mã biến thể hoặc dung tích..."
+                  disabled={importing}
+                />
+                <label className="text-xs text-gray-500 block mb-1.5">Biến thể sản phẩm</label>
+                <select
+                  value={importVariantId}
+                  onChange={(e) => setImportVariantId(e.target.value)}
+                  className="input"
+                  disabled={importing}
+                >
+                  <option value="">Chọn biến thể</option>
+                  {importCandidates.map((item) => (
+                    <option key={item.variant_id} value={item.variant_id}>
+                      #{item.variant_id} - {item.name} ({item.volume_ml}ml)
+                    </option>
+                  ))}
+                </select>
+                {!!normalizedSearch && importCandidates.length === 0 && (
+                  <p className="text-[11px] text-red-500 mt-1">Không tìm thấy biến thể phù hợp.</p>
+                )}
+                {selectedImportItem && (
+                  <div className="mt-2 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
+                    <p className="font-medium text-gray-800 mb-0.5">{selectedImportItem.name} ({selectedImportItem.volume_ml}ml)</p>
+                    <p>
+                      Mã biến thể: <span className="font-medium">#{selectedImportItem.variant_id}</span> - Tồn hiện tại:{' '}
+                      <span className="font-medium">{selectedImportItem.stock}</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1.5">Số lượng nhập thêm</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={importQty}
+                  onChange={(e) => setImportQty(e.target.value)}
+                  className="input"
+                  placeholder="Ví dụ: 20"
+                  disabled={importing}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="btn-outline"
+                disabled={importing}
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleImportStock}
+                className="btn-primary"
+                disabled={importing || !importVariantId || !importQty}
+              >
+                {importing ? 'Đang nhập...' : 'Xác nhận nhập kho'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }
