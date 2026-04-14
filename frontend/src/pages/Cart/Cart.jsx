@@ -74,14 +74,14 @@ export default function Cart() {
                 const slug = item.slug || item.product_slug;
 
                 return (
-                  <div key={itemId} className="py-5 grid grid-cols-12 gap-4 items-center">
-                    <div className="col-span-12 md:col-span-5 flex items-center gap-4">
-                      <Link to={`/products/${slug}`} className="w-18 h-18 md:w-20 md:h-20 flex-shrink-0 bg-light-secondary overflow-hidden">
+                  <div key={itemId} className="py-5 grid grid-cols-12 gap-4 items-start md:items-center">
+                    <div className="col-span-12 md:col-span-5 flex items-center gap-4 min-w-0">
+                      <Link to={`/products/${slug}`} className="w-18 h-18 md:w-20 md:h-20 flex-shrink-0 bg-light-secondary overflow-hidden rounded-lg">
                         {thumbnail ? <img src={mediaUrl(thumbnail)} alt={name} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-light-secondary" />}
                       </Link>
-                      <div>
+                      <div className="min-w-0">
                         <p className="label-tag mb-0.5">{brand}</p>
-                        <Link to={`/products/${slug}`} className="font-serif text-dark text-base hover:text-primary transition-colors">{name}</Link>
+                        <Link to={`/products/${slug}`} className="font-serif text-dark text-base hover:text-primary transition-colors break-words">{name}</Link>
                         <p className="text-xs text-muted font-sans mt-0.5 md:hidden">{size} · {fmtPrice(price)}</p>
                       </div>
                     </div>
