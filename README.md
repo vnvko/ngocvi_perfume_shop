@@ -1,7 +1,8 @@
 # NGOCVI Perfume Boutique
 
 Website bán nước hoa cao cấp — React + Vite + Tailwind CSS.
-
+## tài khoản Admin
+Username: admin@123.com password: 123456
 ## Cài đặt
 
 ```bash
